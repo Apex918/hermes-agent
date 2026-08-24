@@ -1,9 +1,10 @@
-"""Regression: installer/bootstrap must recover from diverged managed clones.
+"""Regression: installer/bootstrap must fail closed on diverged main clones.
 
 When ``~/.hermes/hermes-agent`` has local-only commits (or diverged history),
-``git pull --ff-only`` fails with exit 128 and bootstrap aborts at the
-repository stage. ``hermes update`` already resets to ``origin/$BRANCH`` in
-that case; both installer scripts must do the same.
+``git pull --ff-only`` fails with exit 128. A protected ``main``/``master``
+checkout must not be reset or merged by either installer; it must stop and
+preserve the commits for isolated reconciliation. Non-protected branches may
+still use the managed-install reset fallback.
 
 Fixes the bootstrap failure seen in #53257 and desktop update paths that run
 ``install.ps1`` / ``install.sh`` non-interactively.
@@ -47,6 +48,8 @@ def test_install_sh_resets_when_ff_only_pull_fails() -> None:
     assert 'git pull --ff-only origin "$BRANCH"' in block
     assert 'git reset --hard "origin/$BRANCH"' in block
     assert "Fast-forward not possible" in block
+    assert '[ "$BRANCH" = "main" ]' in block
+    assert "Refusing to reset or merge protected" in block
 
     pull_idx = block.find('git pull --ff-only origin "$BRANCH"')
     reset_idx = block.find('git reset --hard "origin/$BRANCH"')
@@ -60,6 +63,8 @@ def test_install_ps1_resets_when_ff_only_pull_fails() -> None:
     assert "pull --ff-only origin $Branch" in block
     assert 'reset --hard "origin/$Branch"' in block
     assert "Fast-forward not possible" in block
+    assert '$Branch -eq "main"' in block
+    assert "Refusing to reset or merge protected" in block
 
     pull_idx = block.find("pull --ff-only origin $Branch")
     reset_idx = block.find('reset --hard "origin/$Branch"')

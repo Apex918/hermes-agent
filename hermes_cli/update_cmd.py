@@ -6552,8 +6552,26 @@ def _cmd_update_impl(args, gateway_mode: bool):
                         sys.exit(1)
                 else:
                     # Same branch as the update target — a true upstream
-                    # force-push/rebase. Local changes are already stashed;
-                    # reset to match the remote exactly (original behaviour).
+                    # force-push/rebase. Never resolve that divergence by
+                    # resetting the protected main checkout: the nightly loop
+                    # and other non-interactive callers must fail closed rather
+                    # than erase commits that are not reachable from origin.
+                    # Recovery belongs in an explicitly isolated worktree or a
+                    # human-reviewed branch reconciliation.
+                    protected_branch = (_cur_branch or current_branch) in {
+                        "main",
+                        "master",
+                    } and branch in {"main", "master"}
+                    if protected_branch:
+                        print(
+                            "✗ Update stopped — refusing to reset or merge the protected "
+                            f"{branch} checkout after history divergence."
+                        )
+                        print(
+                            "  Create an isolated worktree and reconcile the branch "
+                            "manually; no checkout contents were rewritten."
+                        )
+                        sys.exit(1)
                     print(
                         "  ⚠ Fast-forward not possible (history diverged), resetting to match remote..."
                     )

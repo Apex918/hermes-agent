@@ -180,17 +180,42 @@ def test_cmd_update_skips_stash_restore_when_reset_fails(monkeypatch, tmp_path, 
         lambda *a, **kw: restore_calls.append(1) or True,
     )
 
-    side_effect, _ = _make_update_side_effect(ff_only_fails=True, reset_fails=True)
+    # A protected main checkout now fails closed on divergence. Keep this
+    # lower-level reset-failure regression on a non-protected branch.
+    side_effect, _ = _make_update_side_effect(
+        current_branch="release", ff_only_fails=True, reset_fails=True
+    )
     monkeypatch.setattr(hermes_main.subprocess, "run", side_effect)
 
     with pytest.raises(SystemExit, match="1"):
-        hermes_main.cmd_update(SimpleNamespace())
+        hermes_main.cmd_update(SimpleNamespace(branch="release"))
 
     # Stash restore should NOT have been called
     assert len(restore_calls) == 0
 
     out = capsys.readouterr().out
     assert "preserved in stash" in out
+
+
+def test_cmd_update_fails_closed_on_diverged_main_without_reset(
+    monkeypatch, tmp_path, capsys
+):
+    """A diverged main checkout is never reset or merged by update."""
+    _setup_update_mocks(monkeypatch, tmp_path)
+    side_effect, recorded = _make_update_side_effect(
+        current_branch="main", ff_only_fails=True
+    )
+    monkeypatch.setattr(hermes_main.subprocess, "run", side_effect)
+
+    with pytest.raises(SystemExit, match="1"):
+        hermes_main.cmd_update(SimpleNamespace(branch="main"))
+
+    commands = [" ".join(str(arg) for arg in command) for command in recorded]
+    assert not any("reset --hard" in command for command in commands)
+    assert not any("merge --no-edit" in command for command in commands)
+    out = capsys.readouterr().out
+    assert "protected main checkout" in out
+    assert "isolated worktree" in out
 
 
 # ---------------------------------------------------------------------------

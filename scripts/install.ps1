@@ -2134,10 +2134,16 @@ function Install-Repository {
                     if ($LASTEXITCODE -ne 0) { throw "git checkout $Branch failed (exit $LASTEXITCODE)" }
                     # Managed installs should follow origin/$Branch exactly. If
                     # the checkout has diverged (or has local-only commits),
-                    # ff-only pull cannot succeed -- mirror ``hermes update`` and
-                    # reset to the fetched remote so bootstrap/install can recover.
+                    # ff-only pull cannot succeed. Never rewrite the protected
+                    # main checkout; fail closed and reconcile in an isolated
+                    # worktree instead.
                     git -c windows.appendAtomically=false pull --ff-only origin $Branch
                     if ($LASTEXITCODE -ne 0) {
+                        if (($Branch -eq "main") -or ($Branch -eq "master")) {
+                            Write-Err "Refusing to reset or merge protected $Branch checkout after history divergence."
+                            Write-Err "Create an isolated worktree and reconcile it manually; local commits remain preserved."
+                            throw "Protected branch update stopped"
+                        }
                         Write-Warn "Fast-forward not possible; resetting managed install to origin/$Branch..."
                         git -c windows.appendAtomically=false reset --hard "origin/$Branch"
                         if ($LASTEXITCODE -ne 0) { throw "git reset --hard origin/$Branch failed (exit $LASTEXITCODE)" }

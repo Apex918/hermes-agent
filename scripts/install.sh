@@ -1390,9 +1390,15 @@ clone_repo() {
             git checkout "$BRANCH"
             # Managed installs should follow origin/$BRANCH exactly. If the
             # checkout has diverged (or has local-only commits), ff-only pull
-            # cannot succeed — mirror ``hermes update`` and reset to the
-            # fetched remote so bootstrap/install can recover.
+            # cannot succeed. Never resolve that divergence by rewriting the
+            # protected main checkout: preserve the local commits and fail
+            # closed so reconciliation happens in an isolated worktree.
             if ! git pull --ff-only origin "$BRANCH"; then
+                if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
+                    log_error "Refusing to reset or merge protected $BRANCH checkout after history divergence."
+                    log_error "Create an isolated worktree and reconcile it manually; local commits remain preserved."
+                    return 1
+                fi
                 log_warn "Fast-forward not possible; resetting managed install to origin/$BRANCH..."
                 git reset --hard "origin/$BRANCH"
             fi
