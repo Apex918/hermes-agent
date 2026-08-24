@@ -17,7 +17,7 @@ def _delegate_response():
 
 
 def test_workflow_adapter_resume_once_creates_kanban_graph_and_receipt(tmp_path):
-    plan = Orchestrator().plan("开发一个系统并测试")
+    plan = Orchestrator().plan("开发一个系统并测试", total_time_budget_seconds=120)
     db_path = tmp_path / "kanban.db"
     kb.init_db(db_path=db_path)
     adapter = WorkflowAdapter()
@@ -59,7 +59,7 @@ def test_workflow_adapter_resume_once_creates_kanban_graph_and_receipt(tmp_path)
 
 
 def test_workflow_adapter_receipt_round_trips_across_restart(tmp_path):
-    plan = Orchestrator().plan("开发一个系统并测试")
+    plan = Orchestrator().plan("开发一个系统并测试", total_time_budget_seconds=120)
     db_path = tmp_path / "kanban.db"
     kb.init_db(db_path=db_path)
     adapter = WorkflowAdapter()
@@ -80,7 +80,7 @@ def test_workflow_adapter_receipt_round_trips_across_restart(tmp_path):
 
 
 def test_workflow_adapter_run_completes_without_interrupt(tmp_path):
-    plan = Orchestrator().plan("开发一个系统并测试")
+    plan = Orchestrator().plan("开发一个系统并测试", total_time_budget_seconds=120)
     db_path = tmp_path / "kanban.db"
     kb.init_db(db_path=db_path)
     adapter = WorkflowAdapter()

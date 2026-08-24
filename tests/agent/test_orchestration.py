@@ -162,9 +162,12 @@ def test_delegate_backend_preserves_failure_reason_and_evidence():
 
 
 def test_plan_serializes_role_and_dependency_contract():
-    payload = Orchestrator().plan("开发一个系统").to_dict()
+    payload = Orchestrator().plan(
+        "开发一个系统", total_time_budget_seconds=180
+    ).to_dict()
 
     assert payload["execution_mode"] == "durable"
+    assert payload["total_time_budget_seconds"] == 180
     implementation = next(item for item in payload["tasks"] if item["id"] == "implementation")
     assert implementation["depends_on"] == ["research", "architecture"]
     assert implementation["route"]["profile"] == "default"
@@ -208,3 +211,21 @@ def test_replan_limit_is_enforced():
             plan,
             [TaskResult(task_id="implementation", status="failed", failure_type="quality")],
         )
+
+
+def test_planner_mapping_preserves_scheduler_budget():
+    raw = {
+        "plan_id": "p-budget",
+        "objective": "开发一个系统并测试",
+        "execution_mode": "durable",
+        "total_time_budget_seconds": 240,
+        "tasks": [
+            {"id": "research", "role": "researcher", "backend": "delegate_task"},
+            {"id": "implementation", "role": "coder", "backend": "kanban", "depends_on": ["research"]},
+        ],
+    }
+
+    plan = Orchestrator().plan_from_mapping(raw)
+
+    assert plan.total_time_budget_seconds == 240
+    assert plan.to_dict()["total_time_budget_seconds"] == 240

@@ -6,7 +6,13 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 from agent.orchestration_backends import DelegateBackend, DelegateExecutionResult, KanbanBackend
-from agent.orchestrator import ExecutionMode, Plan, PlanValidationError, TaskResult
+from agent.orchestrator import (
+    ExecutionMode,
+    Plan,
+    PlanValidationError,
+    TaskResult,
+    require_total_time_budget,
+)
 
 
 @dataclass(frozen=True)
@@ -80,6 +86,10 @@ class OrchestrationRuntime:
         return graph
 
     def preflight(self, plan: Plan, *, delegate_fn=None, parent_agent=None):
+        if plan.execution_mode is ExecutionMode.DURABLE:
+            # Validate before invoking delegates: an unbounded durable plan
+            # must never perform preflight work that could later be committed.
+            require_total_time_budget(plan)
         if plan.execution_mode is ExecutionMode.FANOUT:
             if delegate_fn is None:
                 raise PlanValidationError("delegate_fn is required for fanout execution")

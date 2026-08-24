@@ -9,12 +9,49 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from enum import Enum
+import math
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 from uuid import uuid4
 
 
 class PlanValidationError(ValueError):
     """Raised when a plan violates the orchestration contract."""
+
+
+def normalize_total_time_budget(value: object) -> Optional[int]:
+    """Return a scheduler-safe, finite total-time budget in whole seconds.
+
+    A missing value is kept as ``None`` so planning remains side-effect free;
+    durable execution rejects it before delegate or Kanban work begins. Do
+    not coerce strings, booleans, fractions, or non-finite values: accepting
+    any of those would let an unbounded or ambiguous plan reach the scheduler.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise PlanValidationError(
+            "total time budget must be a positive finite number of seconds"
+        )
+    if isinstance(value, float) and (not math.isfinite(value) or not value.is_integer()):
+        raise PlanValidationError(
+            "total time budget must be a positive finite whole number of seconds"
+        )
+    seconds = int(value)
+    if seconds <= 0:
+        raise PlanValidationError(
+            "total time budget must be a positive finite number of seconds"
+        )
+    return seconds
+
+
+def require_total_time_budget(plan: "Plan") -> int:
+    """Fail closed unless a durable plan has an explicit scheduler budget."""
+    budget = normalize_total_time_budget(plan.total_time_budget_seconds)
+    if budget is None:
+        raise PlanValidationError(
+            "durable orchestration requires an explicit total time budget"
+        )
+    return budget
 
 
 class ExecutionMode(str, Enum):
@@ -71,6 +108,14 @@ class Plan:
     classification: Classification
     tasks: Tuple[TaskSpec, ...]
     replan_count: int = 0
+    total_time_budget_seconds: Optional[int] = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "total_time_budget_seconds",
+            normalize_total_time_budget(self.total_time_budget_seconds),
+        )
 
     def task(self, task_id: str) -> TaskSpec:
         for task in self.tasks:
@@ -102,6 +147,7 @@ class Plan:
                 "confidence": self.classification.confidence,
             },
             "replan_count": self.replan_count,
+            "total_time_budget_seconds": self.total_time_budget_seconds,
             "tasks": [
                 {
                     "id": task.id,
@@ -294,7 +340,13 @@ class Orchestrator:
             confidence=0.85 if complexity != "simple" else 0.9,
         )
 
-    def plan(self, objective: str, *, plan_id: Optional[str] = None) -> Plan:
+    def plan(
+        self,
+        objective: str,
+        *,
+        plan_id: Optional[str] = None,
+        total_time_budget_seconds: object = None,
+    ) -> Plan:
         classification = self.classify(objective)
         pid = plan_id or "plan_" + uuid4().hex[:12]
         if classification.complexity == "simple":
@@ -335,7 +387,14 @@ class Orchestrator:
             )
             mode = ExecutionMode.DURABLE
 
-        plan = Plan(pid, objective.strip(), mode, classification, tuple(tasks))
+        plan = Plan(
+            pid,
+            objective.strip(),
+            mode,
+            classification,
+            tuple(tasks),
+            total_time_budget_seconds=normalize_total_time_budget(total_time_budget_seconds),
+        )
         self.validate_plan(plan)
         return plan
 
@@ -364,6 +423,7 @@ class Orchestrator:
 
         classification = self.classify(objective)
         raw_classification = raw.get("classification")
+        raw_budget = raw.get("total_time_budget_seconds", raw.get("total_time_budget"))
         if isinstance(raw_classification, Mapping):
             domains = raw_classification.get("domain", classification.domain)
             if isinstance(domains, str):
@@ -418,6 +478,7 @@ class Orchestrator:
             classification=classification,
             tasks=tuple(tasks),
             replan_count=int(str(raw.get("replan_count", 0) or 0)),
+            total_time_budget_seconds=normalize_total_time_budget(raw_budget),
         )
         self.validate_plan(plan)
         return plan
@@ -552,4 +613,6 @@ __all__ = [
     "RoutePolicy",
     "TaskResult",
     "TaskSpec",
+    "normalize_total_time_budget",
+    "require_total_time_budget",
 ]

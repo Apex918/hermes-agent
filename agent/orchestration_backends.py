@@ -7,7 +7,14 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from agent.model_routing import resolve_model_routes
-from agent.orchestrator import ExecutionMode, Orchestrator, Plan, PlanValidationError, TaskResult
+from agent.orchestrator import (
+    ExecutionMode,
+    Orchestrator,
+    Plan,
+    PlanValidationError,
+    TaskResult,
+    require_total_time_budget,
+)
 
 
 @dataclass(frozen=True)
@@ -145,6 +152,9 @@ class KanbanBackend:
     def compile(self, plan: Plan) -> dict:
         if plan.execution_mode is not ExecutionMode.DURABLE:
             raise PlanValidationError("only durable plans can be compiled as Kanban DAG")
+        # Compilation is a side-effect-free preview used by the plugin UI.
+        # The runtime/submit gates enforce that durable execution has a budget.
+        total_time_budget_seconds = plan.total_time_budget_seconds
         tasks = []
         links = []
         for task in plan.tasks:
@@ -156,10 +166,16 @@ class KanbanBackend:
                     "body": self._body(plan, task),
                     "workspace": "worktree" if task.backend == "kanban" else "scratch",
                     "status": task.status,
+                    "max_runtime_seconds": total_time_budget_seconds,
                 }
             )
             links.extend([[dependency, task.id] for dependency in task.depends_on])
-        return {"plan_id": plan.plan_id, "tasks": tasks, "links": links}
+        return {
+            "plan_id": plan.plan_id,
+            "total_time_budget_seconds": total_time_budget_seconds,
+            "tasks": tasks,
+            "links": links,
+        }
 
     def submit(
         self,
@@ -173,6 +189,7 @@ class KanbanBackend:
         """Submit only the durable portion after verified preflight artifacts."""
         if plan.execution_mode is not ExecutionMode.DURABLE:
             raise PlanValidationError("only durable plans can be submitted to Kanban")
+        total_time_budget_seconds = require_total_time_budget(plan)
         compiled = self.compile(plan)
         artifacts = preflight_artifacts or {}
         missing = [
@@ -197,6 +214,10 @@ class KanbanBackend:
                     gate_lines.append("- %s: %s" % (parent, ", ".join(artifacts[parent])))
             if gate_lines:
                 body += "\n\nVerified preflight artifacts:\n" + "\n".join(gate_lines)
+            body += (
+                "\n\nScheduler-enforced total time budget: %s seconds."
+                % total_time_budget_seconds
+            )
             created[task.id] = kb.create_task(
                 conn,
                 title=task.title,
@@ -206,6 +227,7 @@ class KanbanBackend:
                 parents=(),
                 tenant=tenant,
                 workspace_kind="worktree",
+                max_runtime_seconds=total_time_budget_seconds,
                 skills=list(task.acceptance_criteria),
                 idempotency_key="%s/%s" % (plan.plan_id, task.id),
                 model_override=target.model,
