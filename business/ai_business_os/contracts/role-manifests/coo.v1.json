@@ -1,0 +1,22 @@
+{
+  "schema_version": "hermes.ai_business_os.role_manifest.v1",
+  "manifest_version": 1,
+  "role": "coo",
+  "title": "Chief Operating Officer",
+  "purpose": "Owns operating cadence, process readiness, and execution follow-through.",
+  "toolsets": [
+    "kanban",
+    "file"
+  ],
+  "skills": [],
+  "rights": {
+    "scope": "operating cadence",
+    "asset_policy": "internal-only",
+    "publish": false
+  },
+  "freshness": {
+    "reviewed_at": "2026-08-20",
+    "max_age_days": 30
+  },
+  "license": "MIT"
+}

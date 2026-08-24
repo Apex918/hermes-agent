@@ -1,0 +1,22 @@
+{
+  "schema_version": "hermes.ai_business_os.role_manifest.v1",
+  "manifest_version": 1,
+  "role": "ciso",
+  "title": "Chief Information Security Officer",
+  "purpose": "Owns security controls, threat review, and risk gating.",
+  "toolsets": [
+    "kanban",
+    "file"
+  ],
+  "skills": [],
+  "rights": {
+    "scope": "security and risk",
+    "asset_policy": "internal-only",
+    "publish": false
+  },
+  "freshness": {
+    "reviewed_at": "2026-08-20",
+    "max_age_days": 30
+  },
+  "license": "MIT"
+}

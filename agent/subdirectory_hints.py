@@ -20,6 +20,7 @@ import shlex
 from pathlib import Path
 from typing import Dict, Any, Optional, Set
 
+from hermes_constants import get_real_home
 from agent.prompt_builder import _scan_context_content
 
 logger = logging.getLogger(__name__)
@@ -67,6 +68,25 @@ def _is_ancestor_or_same(a: Path, b: Path) -> bool:
         return True
     except ValueError:
         return False
+
+
+def _resolve_candidate_path(raw_path: str, working_dir: Path) -> Path:
+    """Resolve a path-like tool argument without inheriting profile HOME.
+
+    ``Path.expanduser()`` follows the current process HOME, which can be a
+    profile-scoped Hermes home in some runtimes. For tool arguments we want the
+    user's real home so ``~/...`` resolves the same way regardless of which
+    profile is active.
+    """
+    raw_path = raw_path.strip()
+    p = Path(raw_path)
+    if raw_path == "~" or raw_path.startswith("~/"):
+        p = Path(get_real_home()) / raw_path[2:]
+    elif raw_path.startswith("~"):
+        p = Path(raw_path).expanduser()
+    if not p.is_absolute():
+        p = working_dir / p
+    return p
 
 
 class SubdirectoryHintTracker:
@@ -168,10 +188,7 @@ class SubdirectoryHintTracker:
         ``project/src/`` has no hint files of its own.
         """
         try:
-            p = Path(raw_path).expanduser()
-            if not p.is_absolute():
-                p = self.working_dir / p
-            p = p.resolve()
+            p = _resolve_candidate_path(raw_path, self.working_dir).resolve()
             # Use parent if it's a file path (has extension or doesn't exist as dir)
             if p.suffix or (p.exists() and p.is_file()):
                 p = p.parent
@@ -212,8 +229,8 @@ class SubdirectoryHintTracker:
 
         Only allow subdirectories within the working directory tree.
         This prevents loading AGENTS.md from outside the active workspace
-        (e.g. ~/.codex/AGENTS.md, ~/.claude/CLAUDE.md), which causes
-        cross-agent context contamination and instruction mixup.
+        (e.g. a ``~``-expanded path that lands in a different profile home),
+        which causes cross-agent context contamination and instruction mixup.
         """
         try:
             if not path.is_dir():
@@ -314,7 +331,7 @@ class SubdirectoryHintTracker:
                     rel_path = str(hint_path.relative_to(self.working_dir))
                 except (ValueError, RuntimeError):
                     try:
-                        rel_path = str(hint_path.relative_to(Path.home()))
+                        rel_path = str(hint_path.relative_to(Path(get_real_home())))
                         rel_path = "~/" + rel_path
                     except (ValueError, RuntimeError):
                         pass  # keep absolute

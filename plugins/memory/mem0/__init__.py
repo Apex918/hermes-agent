@@ -186,6 +186,22 @@ DELETE_SCHEMA = {
     },
 }
 
+EXPORT_SCHEMA = {
+    "name": "mem0_export",
+    "description": (
+        "Export all memories in the active user scope so a local/self-hosted "
+        "mirror can audit or migrate them. Use this for verification, backup, "
+        "or proof-of-local-path workflows; it returns the current scope in bulk."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "page": {"type": "integer", "description": "Page number (default: 1)."},
+            "page_size": {"type": "integer", "description": "Rows per page (default: 100)."},
+        },
+    },
+}
+
 
 # ---------------------------------------------------------------------------
 # MemoryProvider implementation
@@ -207,6 +223,11 @@ class Mem0MemoryProvider(MemoryProvider):
         self._agent_id = "hermes"
         self._rerank_default = False
         self._channel = "cli"  # gateway channel name (cli/telegram/discord/...)
+        self._session_id = ""
+        self._parent_session_id = ""
+        self._agent_context = "primary"
+        self._agent_identity = ""
+        self._agent_workspace = ""
         self._sync_thread = None
         self._prefetch_thread = None
         self._prefetch_query = ""
@@ -339,6 +360,11 @@ class Mem0MemoryProvider(MemoryProvider):
         self._mode = self._config.get("mode", "platform")
         self._api_key = self._config.get("api_key", "")
         self._host = self._config.get("host", "")
+        self._session_id = session_id
+        self._parent_session_id = str(kwargs.get("parent_session_id") or "")
+        self._agent_context = str(kwargs.get("agent_context") or "primary")
+        self._agent_identity = str(kwargs.get("agent_identity") or "")
+        self._agent_workspace = str(kwargs.get("agent_workspace") or "")
         # Resolution order for user_id:
         #   1. Operator-configured MEM0_USER_ID (env or $HERMES_HOME/mem0.json) —
         #      the canonical principal, applied across every gateway so the same
@@ -378,9 +404,78 @@ class Mem0MemoryProvider(MemoryProvider):
         return {"user_id": self._user_id}
 
     def _write_metadata(self) -> Dict[str, Any]:
-        # Tag every write with the gateway channel so the dashboard can offer
-        # per-channel filtered views without coupling identity to the channel.
-        return {"channel": self._channel} if self._channel else {}
+        # Tag every write with scope, provenance, retention, and consent so
+        # self-hosted mirrors can replay and audit the write without the live
+        # agent process.
+        return {
+            "channel": self._channel,
+            "scope": {
+                "target": "memory",
+                "user_id": self._user_id,
+                "agent_id": self._agent_id,
+                "channel": self._channel,
+                "identity": self._agent_identity,
+                "workspace": self._agent_workspace,
+            },
+            "provenance": {
+                "session_id": self._session_id,
+                "parent_session_id": self._parent_session_id,
+                "platform": self._channel,
+                "agent_context": self._agent_context,
+            },
+            "retention": {"policy": "provider-default", "scope": "profile"},
+            "consent": {"granted": True, "mode": "implicit", "source": "direct_tool"},
+        }
+
+    def search(self, query: str, *, top_k: int = 10, rerank: bool | None = None) -> list[dict]:
+        if self._backend is None:
+            raise RuntimeError("Mem0 backend not initialized")
+        return self._backend.search(
+            query,
+            filters=self._read_filters(),
+            top_k=top_k,
+            rerank=self._rerank_default if rerank is None else bool(rerank),
+        )
+
+    def add(
+        self,
+        messages: list,
+        *,
+        infer: bool = False,
+        metadata: dict | None = None,
+    ) -> dict:
+        if self._backend is None:
+            raise RuntimeError("Mem0 backend not initialized")
+
+        def _merge(base: dict, extra: dict) -> dict:
+            merged = dict(base)
+            for key, value in extra.items():
+                if isinstance(merged.get(key), dict) and isinstance(value, dict):
+                    merged[key] = _merge(dict(merged[key]), value)
+                else:
+                    merged[key] = value
+            return merged
+
+        merged_metadata = self._write_metadata()
+        if metadata:
+            merged_metadata = _merge(merged_metadata, metadata)
+        return self._backend.add(
+            messages,
+            user_id=self._user_id,
+            agent_id=self._agent_id,
+            infer=infer,
+            metadata=merged_metadata,
+        )
+
+    def delete(self, memory_id: str) -> dict:
+        if self._backend is None:
+            raise RuntimeError("Mem0 backend not initialized")
+        return self._backend.delete(memory_id)
+
+    def export(self, *, page: int = 1, page_size: int = 100) -> dict:
+        if self._backend is None:
+            raise RuntimeError("Mem0 backend not initialized")
+        return self._backend.export(filters=self._read_filters(), page=page, page_size=page_size)
 
     def system_prompt_block(self) -> str:
         # Mirror the precedence in _create_backend (oss > host > platform) so
@@ -408,7 +503,8 @@ class Mem0MemoryProvider(MemoryProvider):
             "results surface; one search is rarely enough. Keep searching until "
             "you have every fact the question needs before you answer.\n"
             "Tools: mem0_search to find memories, mem0_add to store facts, "
-            f"mem0_update and mem0_delete to manage by ID.{rerank_note}"
+            f"mem0_update, mem0_delete, and mem0_export to manage by ID or "
+            f"dump the current scope.{rerank_note}"
         )
 
     def on_turn_start(self, turn_number: int, message: str, **kwargs) -> None:
@@ -512,7 +608,7 @@ class Mem0MemoryProvider(MemoryProvider):
             self._sync_thread.start()
 
     def get_tool_schemas(self) -> List[Dict[str, Any]]:
-        return [SEARCH_SCHEMA, ADD_SCHEMA, UPDATE_SCHEMA, DELETE_SCHEMA]
+        return [SEARCH_SCHEMA, ADD_SCHEMA, UPDATE_SCHEMA, DELETE_SCHEMA, EXPORT_SCHEMA]
 
     def handle_tool_call(self, tool_name: str, args: dict, **kwargs) -> str:
         if self._backend is None:
@@ -605,6 +701,27 @@ class Mem0MemoryProvider(MemoryProvider):
                     return tool_error(f"Memory not found: {memory_id}")
                 self._record_failure()
                 return tool_error(self._format_error("Delete failed", e))
+
+        elif tool_name == "mem0_export":
+            try:
+                page = max(1, int(args.get("page", 1) or 1))
+            except Exception:
+                page = 1
+            try:
+                page_size = max(1, min(int(args.get("page_size", 100) or 100), 500))
+            except Exception:
+                page_size = 100
+            try:
+                result = self._backend.export(
+                    filters=self._read_filters(), page=page, page_size=page_size
+                )
+                self._record_success()
+                if isinstance(result, dict):
+                    return json.dumps(result)
+                return json.dumps({"results": result, "count": len(result) if isinstance(result, list) else 0})
+            except Exception as e:
+                self._record_failure()
+                return tool_error(self._format_error("Export failed", e))
 
         return tool_error(f"Unknown tool: {tool_name}")
 

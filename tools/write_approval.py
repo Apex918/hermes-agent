@@ -51,6 +51,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from hermes_constants import get_hermes_home
+from business.ai_business_os.approval_state_machine import (
+    DEFAULT_STATE_MACHINE,
+    ApprovalLevel,
+    ApprovalPlan,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -111,8 +116,16 @@ def _pending_dir(subsystem: str) -> Path:
     return get_hermes_home() / "pending" / subsystem
 
 
-def stage_write(subsystem: str, payload: Dict[str, Any],
-                *, summary: str, origin: str) -> Dict[str, Any]:
+def stage_write(
+    subsystem: str,
+    payload: Dict[str, Any],
+    *,
+    summary: str,
+    origin: str,
+    dry_run: bool = False,
+    receipt: str | None = None,
+    approval_level: ApprovalLevel | None = None,
+) -> Dict[str, Any]:
     """Persist a pending write and return a short record describing it.
 
     Args:
@@ -124,31 +137,110 @@ def stage_write(subsystem: str, payload: Dict[str, Any],
             For skills this is the LLM/heuristic gist; for memory it can be the
             entry text itself.
         origin: ``foreground`` or ``background_review`` — recorded for audit.
+        dry_run: when true, build the approval record without writing it to disk.
+        receipt: optional approval receipt for pre-authorized R2/R3 operations.
+        approval_level: optional explicit risk tier override (defaults to
+            subsystem/action inference).
 
     Returns a dict with ``id`` and metadata. Best-effort: on disk failure it
     logs and still returns a record (the write is simply lost, which is the
     safe failure for an approval gate — nothing is silently committed).
     """
     pid = uuid.uuid4().hex[:8]
+    action = payload.get("action", "")
+    plan = DEFAULT_STATE_MACHINE.plan(
+        subsystem=subsystem,
+        action=action,
+        payload=payload,
+        summary=summary,
+        origin=origin or "foreground",
+        receipt=receipt,
+        dry_run=dry_run,
+        approval_level=approval_level,
+    )
     record = {
         "id": pid,
         "subsystem": subsystem,
-        "action": payload.get("action", ""),
+        "action": action,
         "summary": (summary or "").strip(),
         "origin": origin or "foreground",
         "created_at": time.time(),
         "payload": payload,
+        "preview": plan.preview,
+        "diff": plan.diff,
+        "rollback": plan.rollback,
+        "audit_ref": plan.audit_ref,
+        "approval_level": plan.approval_level,
+        "receipt_required": plan.receipt_required,
+        "idempotency_key": plan.idempotency_key,
+        "dry_run": dry_run,
+        "staged": not dry_run,
+        "status": plan.status,
+        "reason": plan.reason,
+        "receipt": receipt or "",
     }
+    if subsystem == SKILLS and not dry_run:
+        try:
+            record["diff"] = skill_pending_diff(record)
+        except Exception:
+            pass
     try:
-        d = _pending_dir(subsystem)
-        d.mkdir(parents=True, exist_ok=True)
-        path = d / f"{pid}.json"
-        tmp = path.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
-        os.replace(tmp, path)
+        if not dry_run:
+            d = _pending_dir(subsystem)
+            d.mkdir(parents=True, exist_ok=True)
+            path = d / f"{pid}.json"
+            tmp = path.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+            os.replace(tmp, path)
     except Exception as e:  # pragma: no cover - disk failure path
         logger.error("Failed to stage pending %s write: %s", subsystem, e, exc_info=True)
     return record
+
+
+def _record_to_plan(record: Dict[str, Any]) -> ApprovalPlan:
+    return ApprovalPlan(
+        subsystem=record.get("subsystem", ""),
+        action=record.get("action", ""),
+        approval_level=record.get("approval_level", "R1"),
+        receipt_required=bool(record.get("receipt_required", False)),
+        preview=record.get("preview", ""),
+        diff=record.get("diff", ""),
+        rollback=record.get("rollback", {}),
+        audit_ref=record.get("audit_ref", ""),
+        idempotency_key=record.get("idempotency_key", ""),
+        status=record.get("status", "pending"),
+        dry_run=bool(record.get("dry_run", False)),
+        receipt=record.get("receipt", ""),
+        reason=record.get("reason", ""),
+    )
+
+
+def apply_pending(
+    record: Dict[str, Any],
+    effect,
+    *,
+    receipt: str | None = None,
+) -> Dict[str, Any]:
+    """Apply a staged record once, enforcing receipt and idempotency.
+
+    The caller passes the real side-effect callback. If the record is a dry-run
+    preview or the receipt is missing for an R2/R3 transition, the callback is
+    never invoked.
+    """
+    if record.get("dry_run"):
+        return {
+            "success": False,
+            "status": "rejected",
+            "error": "dry-run records cannot be applied",
+            "audit_ref": record.get("audit_ref", ""),
+            "idempotency_key": record.get("idempotency_key", ""),
+            "approval_level": record.get("approval_level", "R1"),
+            "preview": record.get("preview", ""),
+            "diff": record.get("diff", ""),
+            "rollback": record.get("rollback", {}),
+        }
+    plan = _record_to_plan(record)
+    return DEFAULT_STATE_MACHINE.apply_once(plan, effect, receipt=receipt)
 
 
 def list_pending(subsystem: str) -> List[Dict[str, Any]]:

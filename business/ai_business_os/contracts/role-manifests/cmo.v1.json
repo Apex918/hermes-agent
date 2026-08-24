@@ -1,0 +1,22 @@
+{
+  "schema_version": "hermes.ai_business_os.role_manifest.v1",
+  "manifest_version": 1,
+  "role": "cmo",
+  "title": "Chief Marketing Officer",
+  "purpose": "Owns positioning, demand generation, launch messaging, and brand voice.",
+  "toolsets": [
+    "kanban",
+    "file"
+  ],
+  "skills": [],
+  "rights": {
+    "scope": "marketing and comms",
+    "asset_policy": "internal-only",
+    "publish": false
+  },
+  "freshness": {
+    "reviewed_at": "2026-08-20",
+    "max_age_days": 30
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,22 @@
+{
+  "schema_version": "hermes.ai_business_os.role_manifest.v1",
+  "manifest_version": 1,
+  "role": "chro",
+  "title": "Chief Human Resources Officer",
+  "purpose": "Owns hiring, people policies, performance, and team health review.",
+  "toolsets": [
+    "kanban",
+    "file"
+  ],
+  "skills": [],
+  "rights": {
+    "scope": "people operations",
+    "asset_policy": "internal-only",
+    "publish": false
+  },
+  "freshness": {
+    "reviewed_at": "2026-08-20",
+    "max_age_days": 30
+  },
+  "license": "MIT"
+}

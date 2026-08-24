@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -31,6 +32,10 @@ class Mem0Backend(ABC):
 
     @abstractmethod
     def delete(self, memory_id: str) -> dict:
+        ...
+
+    @abstractmethod
+    def export(self, *, filters: dict, page: int = 1, page_size: int = 100) -> dict:
         ...
 
     def close(self) -> None:
@@ -78,6 +83,9 @@ class PlatformBackend(Mem0Backend):
     def delete(self, memory_id: str) -> dict:
         self._client.delete(memory_id=memory_id)
         return {"result": "Memory deleted.", "memory_id": memory_id}
+
+    def export(self, *, filters: dict, page: int = 1, page_size: int = 100) -> dict:
+        return self._client.get_all(filters=filters, page=page, page_size=page_size)
 
 
 class SelfHostedBackend(Mem0Backend):
@@ -145,6 +153,12 @@ class SelfHostedBackend(Mem0Backend):
     def delete(self, memory_id: str) -> dict:
         self._json("DELETE", f"/memories/{memory_id}")
         return {"result": "Memory deleted.", "memory_id": memory_id}
+
+    def export(self, *, filters: dict, page: int = 1, page_size: int = 100) -> dict:
+        params: dict[str, Any] = {"page": page, "page_size": page_size}
+        if filters:
+            params["filters"] = json.dumps(filters, separators=(",", ":"))
+        return self._json("GET", "/memories", params=params)
 
     def close(self) -> None:
         try:
@@ -294,6 +308,9 @@ class OSSBackend(Mem0Backend):
     def delete(self, memory_id: str) -> dict:
         self._memory.delete(memory_id)
         return {"result": "Memory deleted.", "memory_id": memory_id}
+
+    def export(self, *, filters: dict, page: int = 1, page_size: int = 100) -> dict:
+        return self._memory.get_all(filters=filters, page=page, page_size=page_size)
 
     def close(self):
         try:

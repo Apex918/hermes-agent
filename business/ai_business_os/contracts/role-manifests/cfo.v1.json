@@ -1,0 +1,22 @@
+{
+  "schema_version": "hermes.ai_business_os.role_manifest.v1",
+  "manifest_version": 1,
+  "role": "cfo",
+  "title": "Chief Financial Officer",
+  "purpose": "Owns budgets, forecast discipline, spend controls, and financial risk review.",
+  "toolsets": [
+    "kanban",
+    "file"
+  ],
+  "skills": [],
+  "rights": {
+    "scope": "financial controls",
+    "asset_policy": "internal-only",
+    "publish": false
+  },
+  "freshness": {
+    "reviewed_at": "2026-08-20",
+    "max_age_days": 30
+  },
+  "license": "MIT"
+}

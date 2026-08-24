@@ -138,6 +138,18 @@ class TestMemoryProviderABC:
         p.sync_turn("user", "assistant")
         p.shutdown()
 
+    def test_default_crud_helpers_are_opt_in_only(self):
+        """The new local/self-hosted CRUD contract stays opt-in for old providers."""
+        p = FakeMemoryProvider()
+        with pytest.raises(NotImplementedError):
+            p.add({"content": "test"})
+        with pytest.raises(NotImplementedError):
+            p.search("query")
+        with pytest.raises(NotImplementedError):
+            p.delete("m1")
+        with pytest.raises(NotImplementedError):
+            p.export()
+
 
 # ---------------------------------------------------------------------------
 # MemoryManager tests

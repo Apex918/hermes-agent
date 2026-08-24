@@ -110,6 +110,8 @@ def _approve(subsystem: str, rest: List[str], memory_store) -> str:
     if err or target is None:
         return err or f"Usage: /{subsystem} approve <id>"
 
+    receipt = rest[1] if len(rest) > 1 else None
+
     records = wa.list_pending(subsystem)
     if not records:
         return f"No pending {subsystem} writes."
@@ -124,7 +126,7 @@ def _approve(subsystem: str, rest: List[str], memory_store) -> str:
 
     applied, failed = 0, []
     for rec in targets:
-        ok, msg = _apply_one(subsystem, rec, memory_store)
+        ok, msg = _apply_one(subsystem, rec, memory_store, receipt=receipt)
         if ok:
             wa.discard_pending(subsystem, rec["id"])
             applied += 1
@@ -138,19 +140,30 @@ def _approve(subsystem: str, rest: List[str], memory_store) -> str:
     return "\n".join(out)
 
 
-def _apply_one(subsystem: str, rec, memory_store):
+def _apply_one(subsystem: str, rec, memory_store, *, receipt=None):
     payload = rec.get("payload", {})
     try:
+        effect = None
         if subsystem == wa.MEMORY:
-            if memory_store is None:
-                return False, "memory store unavailable"
-            from tools.memory_tool import apply_memory_pending
-            result = apply_memory_pending(payload, memory_store)
-            return bool(result.get("success")), result.get("error", "")
+            def _memory_effect():
+                if memory_store is None:
+                    return {"success": False, "error": "memory store unavailable"}
+                from tools.memory_tool import apply_memory_pending
+                return apply_memory_pending(payload, memory_store)
+            effect = _memory_effect
         else:
-            from tools.skill_manager_tool import apply_skill_pending
-            result = json.loads(apply_skill_pending(payload))
-            return bool(result.get("success")), result.get("error", "")
+            def _skill_effect():
+                from tools.skill_manager_tool import apply_skill_pending
+                return json.loads(apply_skill_pending(payload))
+            effect = _skill_effect
+
+        result = wa.apply_pending(rec, effect, receipt=receipt)
+        if not result.get("success"):
+            return False, result.get("error", "")
+        applied = result.get("result", {})
+        if isinstance(applied, dict):
+            return bool(applied.get("success", True)), applied.get("error", "")
+        return True, ""
     except Exception as e:
         return False, str(e)
 

@@ -1,0 +1,22 @@
+{
+  "license_evidence": {
+    "verified": false,
+    "source": "local-fixture",
+    "reason": "offline sandbox only; external Twenty license evidence is not verified",
+    "notes": "This fixture exists to prove the proposal-only gate without touching any external service."
+  },
+  "records": [
+    {
+      "id": "twenty-001",
+      "name": "Twenty Sandbox Lead",
+      "company": "Twenty Fixture Lab",
+      "email": "lead@fixture.local"
+    },
+    {
+      "id": "twenty-002",
+      "name": "Twenty Sandbox Prospect",
+      "company": "Twenty Fixture Lab",
+      "email": "prospect@fixture.local"
+    }
+  ]
+}

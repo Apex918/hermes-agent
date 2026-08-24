@@ -91,7 +91,29 @@ class TestSubdirectoryHintTracker:
         assert result is not None
         assert "Frontend rules" in result
 
+    def test_tilde_path_uses_real_home_not_profile_home(self, tmp_path, monkeypatch):
+        """Paths that start with ~ should resolve against the real home."""
+        profile_root = tmp_path / ".hermes" / "profiles" / "code"
+        profile_home = profile_root / "home"
+        real_home = tmp_path / "real-home"
+        profile_home.mkdir(parents=True)
+        real_home.mkdir()
 
+        monkeypatch.setenv("HERMES_HOME", str(profile_root))
+        monkeypatch.setenv("HOME", str(profile_home))
+        monkeypatch.setenv("HERMES_REAL_HOME", str(real_home))
+
+        project = real_home / "project"
+        frontend = project / "frontend"
+        frontend.mkdir(parents=True)
+        (frontend / "CLAUDE.md").write_text("Real-home frontend rules")
+
+        tracker = SubdirectoryHintTracker(working_dir=str(project))
+        result = tracker.check_tool_call(
+            "terminal", {"command": "cat ~/project/frontend/index.ts"}
+        )
+        assert result is not None
+        assert "Real-home frontend rules" in result
 
     def test_truncation_of_large_hints(self, tmp_path):
         """Hint files over the limit are truncated."""

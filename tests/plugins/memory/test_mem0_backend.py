@@ -65,6 +65,12 @@ class TestPlatformBackend:
         # don't surprise older mem0 client versions with an unknown kwarg.
         assert "metadata" not in call[2]
 
+    def test_export_forwards_page_controls(self):
+        backend, client = self._make()
+        result = backend.export(filters={"user_id": "u1"}, page=2, page_size=25)
+        assert client.calls[0][0] == "get_all"
+        assert client.calls[0][1] == {"filters": {"user_id": "u1"}, "page": 2, "page_size": 25}
+        assert result["count"] == 1
 
     def test_update_forwards(self):
         backend, client = self._make()
@@ -75,6 +81,13 @@ class TestPlatformBackend:
         backend, client = self._make()
         backend.delete("m1")
         assert client.calls[0][1] == {"memory_id": "m1"}
+
+    def test_export_forwards(self):
+        backend, client = self._make()
+        result = backend.export(filters={"user_id": "u1"}, page=3, page_size=7)
+        assert client.calls[0][0] == "get_all"
+        assert client.calls[0][1] == {"filters": {"user_id": "u1"}, "page": 3, "page_size": 7}
+        assert result["results"][0]["id"] == "m1"
 
 
 class FakeOSSMemory:
@@ -203,9 +216,13 @@ class TestSelfHostedBackend:
 
     # --- search ----------------------------------------------------------
 
-
     # --- add / update / delete ------------------------------------------
 
+    def test_export_hits_memories_list_endpoint(self):
+        s = _StubServer(rows=3)
+        result = _backend(s).export(filters={"user_id": "u1"}, page=2, page_size=2)
+        assert any(req.url.path == "/memories" and req.method == "GET" for req in s.requests)
+        assert result["results"][0]["id"] == "m0"
 
     # --- error propagation (feeds the plugin's circuit breaker) ----------
 

@@ -4620,6 +4620,17 @@ def _load_config() -> dict:
             full = load_config_readonly()
             cfg = full.get("delegation") or {}
             if isinstance(cfg, dict):
+                cfg = dict(cfg)
+                # Keep explicit legacy delegation settings authoritative. When
+                # they are blank, an explicit orchestration.worker route is the
+                # role-aware source of truth for Planner-created workers.
+                orchestration = full.get("orchestration") or {}
+                worker = orchestration.get("worker") if isinstance(orchestration, dict) else None
+                primary = worker.get("primary") if isinstance(worker, dict) else None
+                if isinstance(primary, dict):
+                    for key in ("provider", "model", "base_url", "api_mode"):
+                        if not str(cfg.get(key) or "").strip() and primary.get(key):
+                            cfg[key] = primary[key]
                 return cfg
         except Exception:
             pass

@@ -237,6 +237,28 @@ class MemoryProvider(ABC):
     def shutdown(self) -> None:
         """Clean shutdown — flush queues, close connections."""
 
+    # -- Optional CRUD contract (for local/self-hosted providers) ------------
+
+    def add(self, *args, **kwargs) -> Any:
+        """Store a memory record and return a backend-specific receipt.
+
+        Local/self-hosted providers may override this to expose a direct CRUD
+        surface. The default implementation stays opt-in for older providers.
+        """
+        raise NotImplementedError(f"Provider {self.name} does not support add()")
+
+    def search(self, *args, **kwargs) -> Any:
+        """Search memory records and return backend-specific results."""
+        raise NotImplementedError(f"Provider {self.name} does not support search()")
+
+    def delete(self, *args, **kwargs) -> Any:
+        """Delete a memory record and return a backend-specific receipt."""
+        raise NotImplementedError(f"Provider {self.name} does not support delete()")
+
+    def export(self, *args, **kwargs) -> Any:
+        """Export all memory records for the active scope."""
+        raise NotImplementedError(f"Provider {self.name} does not support export()")
+
     # -- Optional hooks (override to opt in) ---------------------------------
 
     def on_turn_start(self, turn_number: int, message: str, **kwargs) -> None:
@@ -379,7 +401,8 @@ class MemoryProvider(ABC):
         target: 'memory' or 'user'
         content: the entry content
         metadata: structured provenance for the write, when available. Common
-          keys include ``write_origin``, ``execution_context``, ``session_id``,
+          keys include ``scope``, ``provenance``, ``retention``, ``consent``,
+          ``write_origin``, ``execution_context``, ``session_id``,
           ``parent_session_id``, ``platform``, and ``tool_name``.
 
         Use to mirror built-in memory writes to your backend.
