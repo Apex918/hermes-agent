@@ -2078,16 +2078,72 @@ def _stash_apply_failed_only_on_existing_untracked(stderr: str) -> bool:
     if not lines:
         return False
     saw_untracked_error = False
+    in_untracked_file_list = False
     for ln in lines:
         if "already exists, no checkout" in ln:
             saw_untracked_error = True
         elif "could not restore untracked files from stash" in ln:
             saw_untracked_error = True
+        elif "following untracked working tree files would be overwritten" in ln:
+            # Git versions that fail before applying the tracked part report
+            # the undeletable paths as a merge-style error block instead of
+            # using the newer "already exists" wording.
+            saw_untracked_error = True
+            in_untracked_file_list = True
+        elif in_untracked_file_list and (
+            ln.startswith(("Please ", "Aborting", "error:"))
+            or ln.endswith(".")
+        ):
+            in_untracked_file_list = False
         elif ln.startswith(("warning:", "hint:")):
+            continue
+        elif in_untracked_file_list:
+            # Path lines in the block are diagnostics, not a second failure.
+            continue
+        elif ln.startswith("Aborting") and saw_untracked_error:
             continue
         else:
             return False
     return saw_untracked_error
+
+
+def _apply_tracked_stash_changes(
+    git_cmd: list[str], cwd: Path, stash_ref: str
+) -> bool:
+    """Apply only the tracked portion of a stash.
+
+    ``git stash apply`` can refuse the entire operation when an untracked file
+    from the stash is still present because Git could not remove it during the
+    preceding ``stash push``.  In that case the tracked edits are still
+    recoverable from the stash commit's first-parent diff; applying that diff
+    separately preserves both the edits and the undeletable untracked file.
+    """
+    diff = subprocess.run(
+        git_cmd + ["diff", "--binary", f"{stash_ref}^1", stash_ref, "--"],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if diff.returncode != 0 or not diff.stdout:
+        return False
+    applied = subprocess.run(
+        git_cmd + ["apply", "--3way"],
+        cwd=cwd,
+        input=diff.stdout,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if applied.returncode != 0:
+        if applied.stdout.strip():
+            print(applied.stdout.strip())
+        if applied.stderr.strip():
+            print(applied.stderr.strip())
+        return False
+    return True
 
 def _park_stashed_changes(stash_ref: str) -> None:
     """Leave a pre-update autostash parked instead of re-applying it.
@@ -2153,14 +2209,24 @@ def _restore_stashed_changes(
     )
     has_conflicts = bool(unmerged.stdout.strip())
 
-    if restore.returncode != 0 and not has_conflicts and (
-        _stash_apply_failed_only_on_existing_untracked(restore.stderr)
-    ):
+    untracked_only_failure = (
+        restore.returncode != 0
+        and not has_conflicts
+        and _stash_apply_failed_only_on_existing_untracked(
+            "\n".join(part for part in (restore.stdout, restore.stderr) if part)
+        )
+    )
+    if untracked_only_failure:
         # Permission-denied autostash tail end: the tracked changes applied
         # cleanly; the only "failure" is untracked files that never left the
         # working tree (git could not delete them at stash time, so it now
         # refuses to overwrite them). Their content was never touched —
-        # nothing is lost. Treat as restored.
+        # nothing is lost. Some Git versions abort before applying the tracked
+        # portion, so explicitly apply that first-parent diff when needed.
+        if not _apply_tracked_stash_changes(git_cmd, cwd, stash_ref):
+            print("✗ Update pulled new code, but restoring tracked local changes failed.")
+            print(f"  Restore manually with: git stash apply {stash_ref}")
+            return False
         print(
             "  ⚠ Some stashed untracked files already exist in the working "
             "tree and were kept as-is."
