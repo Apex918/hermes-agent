@@ -1,6 +1,8 @@
 import json
+from types import SimpleNamespace
 from typing import cast
 
+from agent.model_routing import ModelPlanner, resolve_model_routes
 from agent.orchestrator import Orchestrator
 from agent.orchestration_runtime import OrchestrationRunResult
 from agent.workflow_adapter import WorkflowAdapter, WorkflowReceipt
@@ -14,6 +16,81 @@ def _delegate_response():
             {"task_index": 1, "status": "completed", "artifacts": ["/tmp/architecture.md"]},
         ]
     })
+
+
+class _PlannerCall:
+    def __init__(self, response):
+        self.response = response
+        self.calls = []
+
+    def __call__(self, **kwargs):
+        self.calls.append(kwargs)
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=self.response))]
+        )
+
+
+def test_model_planner_durable_budget_enters_workflow_adapter(tmp_path):
+    planner_call = _PlannerCall(
+        json.dumps(
+            {
+                "plan_id": "planner-budget",
+                "objective": "开发一个系统并测试",
+                "execution_mode": "durable",
+                "total_time_budget_seconds": 240,
+                "tasks": [
+                    {
+                        "id": "research",
+                        "title": "研究需求",
+                        "role": "researcher",
+                        "backend": "delegate_task",
+                        "depends_on": [],
+                    },
+                    {
+                        "id": "implementation",
+                        "title": "实现系统",
+                        "role": "coder",
+                        "backend": "kanban",
+                        "depends_on": ["research"],
+                    },
+                    {
+                        "id": "review",
+                        "title": "审查实现",
+                        "role": "reviewer",
+                        "backend": "kanban",
+                        "depends_on": ["implementation"],
+                    },
+                ],
+            }
+        )
+    )
+    planned = ModelPlanner(
+        resolve_model_routes({}), call_llm=planner_call
+    ).plan("开发一个系统并测试")
+
+    assert planned.plan.total_time_budget_seconds == 240
+    assert planned.plan.to_dict()["total_time_budget_seconds"] == 240
+    assert "total_time_budget_seconds" in planner_call.calls[0]["messages"][0]["content"]
+
+    db_path = tmp_path / "kanban.db"
+    kb.init_db(db_path=db_path)
+    adapter = WorkflowAdapter()
+    receipt = adapter.start(
+        planned.plan,
+        delegate_fn=lambda **kwargs: json.dumps(
+            {"results": [{"status": "completed", "artifacts": ["/tmp/research.md"]}]}
+        ),
+        parent_agent="parent",
+    )
+    assert receipt.phase == "awaiting_kanban"
+    assert receipt.plan["total_time_budget_seconds"] == 240
+
+    with kb.connect(db_path=db_path) as conn:
+        result = adapter.resume(receipt, kanban_conn=conn)
+        assert result.success is True
+        rows = list(kb.list_tasks(conn))
+        assert len(rows) == 2
+        assert all(row.max_runtime_seconds == 240 for row in rows)
 
 
 def test_workflow_adapter_resume_once_creates_kanban_graph_and_receipt(tmp_path):
