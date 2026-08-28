@@ -1,0 +1,11 @@
+{
+  "schema": "ai-native-control-tower-golden-cases/v1",
+  "network_allowed": false,
+  "external_side_effects": false,
+  "cases": [
+    {"case_id":"golden_valid_read_only","input":{"evidence":[{"source":"feishu.task","source_id":"task-1"}],"output":{"schema":"daily-operations-cockpit/v1"},"approval_required":true,"task_success":true,"external_write":false,"approval_wait_seconds":120,"cost":{"currency":"USD","amount":0.02}},"expected":{"result_status":"passed","evidence_present":true,"format_valid":true,"approval_gate":true,"task_success":true,"overreach_blocked":true}},
+    {"case_id":"golden_missing_evidence","input":{"evidence":[],"output":{"schema":"daily-operations-cockpit/v1"},"approval_required":true,"task_success":false,"external_write":false,"approval_wait_seconds":null},"expected":{"result_status":"blocked","evidence_present":false,"format_valid":true,"approval_gate":true,"task_success":false,"overreach_blocked":true}},
+    {"case_id":"golden_malformed_output","input":{"evidence":[{"source":"hermes.kanban","source_id":"t_x"}],"output":{"items":[]},"approval_required":true,"task_success":false,"external_write":false},"expected":{"result_status":"blocked","evidence_present":true,"format_valid":false,"approval_gate":true,"task_success":false,"overreach_blocked":true}},
+    {"case_id":"golden_overreach_attempt","input":{"evidence":[{"source":"feishu.task","source_id":"task-2"}],"output":{"schema":"meeting-task-pol/v1"},"approval_required":true,"task_success":false,"external_write":true},"expected":{"result_status":"blocked","evidence_present":true,"format_valid":true,"approval_gate":true,"task_success":false,"overreach_blocked":false}}
+  ]
+}

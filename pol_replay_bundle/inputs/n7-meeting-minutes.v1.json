@@ -1,0 +1,281 @@
+{
+  "schema_version": "hermes.ai_business_os.meeting_minutes.v1",
+  "manifest_version": 1,
+  "network_policy": {
+    "network_allowed": false,
+    "external_side_effects": false,
+    "source": "checked-in-local-fixture"
+  },
+  "meetings": [
+    {
+      "meeting_id": "meeting-001",
+      "title": "Weekly operations review",
+      "meeting_date": "2026-09-01",
+      "decisions": [
+        {
+          "schema_version": "hermes.ai_business_os.decision_record.v1",
+          "manifest_version": 1,
+          "decision_id": "decision-001",
+          "owner": "operations",
+          "approver": "chief_of_staff",
+          "review_date": "2026-09-01",
+          "decision": "approved",
+          "subject": "operations-follow-up",
+          "rationale": "The evidence supports a bounded follow-up."
+        }
+      ],
+      "action_requests": [
+        {
+          "schema_version": "hermes.ai_business_os.action_request.v1",
+          "manifest_version": 1,
+          "request_id": "action-001",
+          "owner": "operations",
+          "effect_level": "R2",
+          "preview": {"target": "feishu_task", "operation": "create"},
+          "rollback": {"operation": "delete_preview", "required": true},
+          "approvers": ["chief_of_staff"],
+          "idempotency_key": "action-001-v1",
+          "audit_ref": "audit:action-001",
+          "action": "create-task",
+          "subject": "operations-follow-up"
+        }
+      ],
+      "work_items": [
+        {
+          "work_item": {
+            "schema_version": "hermes.ai_business_os.work_item.v1",
+            "manifest_version": 1,
+            "work_item_id": "work-001",
+            "title": "Publish the operations evidence checklist",
+            "owner": "operations",
+            "effect_level": "R2",
+            "acceptance_criteria": ["Checklist is reviewed", "Evidence references are present"],
+            "idempotency_key": "work-001-v1",
+            "audit_ref": "audit:work-001",
+            "status": "ready",
+            "priority": "P1",
+            "evidence_refs": ["evidence-001"]
+          },
+          "due_date": "2026-09-05",
+          "kanban_dependencies": ["t_parent001"]
+        }
+      ]
+    },
+    {
+      "meeting_id": "meeting-002",
+      "title": "Research prioritization",
+      "meeting_date": "2026-09-02",
+      "decisions": [
+        {
+          "schema_version": "hermes.ai_business_os.decision_record.v1",
+          "manifest_version": 1,
+          "decision_id": "decision-002",
+          "owner": "research",
+          "approver": "chief_of_staff",
+          "review_date": "2026-09-02",
+          "decision": "approved",
+          "subject": "research-follow-up",
+          "rationale": "The research scope is limited to internal evidence."
+        }
+      ],
+      "action_requests": [
+        {
+          "schema_version": "hermes.ai_business_os.action_request.v1",
+          "manifest_version": 1,
+          "request_id": "action-002",
+          "owner": "research",
+          "effect_level": "R2",
+          "preview": {"target": "feishu_task", "operation": "create"},
+          "rollback": {"operation": "delete_preview", "required": true},
+          "approvers": ["chief_of_staff"],
+          "idempotency_key": "action-002-v1",
+          "audit_ref": "audit:action-002",
+          "action": "create-task",
+          "subject": "research-follow-up"
+        }
+      ],
+      "work_items": [
+        {
+          "work_item": {
+            "schema_version": "hermes.ai_business_os.work_item.v1",
+            "manifest_version": 1,
+            "work_item_id": "work-002",
+            "title": "Compare the two research hypotheses",
+            "owner": "research",
+            "effect_level": "R1",
+            "acceptance_criteria": ["Both hypotheses are cited", "Recommendation is explicit"],
+            "idempotency_key": "work-002-v1",
+            "audit_ref": "audit:work-002",
+            "status": "ready",
+            "priority": "P1",
+            "evidence_refs": ["evidence-002"]
+          },
+          "due_date": "2026-09-06T17:00:00+08:00",
+          "kanban_dependencies": []
+        }
+      ]
+    },
+    {
+      "meeting_id": "meeting-003",
+      "title": "Security readiness review",
+      "meeting_date": "2026-09-03",
+      "decisions": [
+        {
+          "schema_version": "hermes.ai_business_os.decision_record.v1",
+          "manifest_version": 1,
+          "decision_id": "decision-003",
+          "owner": "ciso",
+          "approver": "chief_of_staff",
+          "review_date": "2026-09-03",
+          "decision": "approved",
+          "subject": "security-follow-up",
+          "rationale": "The security action remains bounded and reviewable."
+        }
+      ],
+      "action_requests": [
+        {
+          "schema_version": "hermes.ai_business_os.action_request.v1",
+          "manifest_version": 1,
+          "request_id": "action-003",
+          "owner": "ciso",
+          "effect_level": "R2",
+          "preview": {"target": "feishu_task", "operation": "create"},
+          "rollback": {"operation": "delete_preview", "required": true},
+          "approvers": ["chief_of_staff"],
+          "idempotency_key": "action-003-v1",
+          "audit_ref": "audit:action-003",
+          "action": "create-task",
+          "subject": "security-follow-up"
+        }
+      ],
+      "work_items": [
+        {
+          "work_item": {
+            "schema_version": "hermes.ai_business_os.work_item.v1",
+            "manifest_version": 1,
+            "work_item_id": "work-003",
+            "title": "Close the evidence retention gap",
+            "owner": "ciso",
+            "effect_level": "R2",
+            "acceptance_criteria": ["Retention owner is named", "Rollback is documented"],
+            "idempotency_key": "work-003-v1",
+            "audit_ref": "audit:work-003",
+            "status": "ready",
+            "priority": "P1",
+            "evidence_refs": ["evidence-003"]
+          },
+          "owner": "",
+          "due_date": "2026-09-07",
+          "kanban_dependencies": ["t_parent001", "t_security02"]
+        }
+      ]
+    },
+    {
+      "meeting_id": "meeting-004",
+      "title": "Launch coordination",
+      "meeting_date": "2026-09-04",
+      "decisions": [
+        {
+          "schema_version": "hermes.ai_business_os.decision_record.v1",
+          "manifest_version": 1,
+          "decision_id": "decision-004",
+          "owner": "chief_of_staff",
+          "approver": "chief_of_staff",
+          "review_date": "2026-09-04",
+          "decision": "approved",
+          "subject": "launch-follow-up",
+          "rationale": "The launch checklist is ready for an owned follow-up."
+        }
+      ],
+      "action_requests": [
+        {
+          "schema_version": "hermes.ai_business_os.action_request.v1",
+          "manifest_version": 1,
+          "request_id": "action-004",
+          "owner": "chief_of_staff",
+          "effect_level": "R2",
+          "preview": {"target": "feishu_task", "operation": "create"},
+          "rollback": {"operation": "delete_preview", "required": true},
+          "approvers": ["chief_of_staff"],
+          "idempotency_key": "action-004-v1",
+          "audit_ref": "audit:action-004",
+          "action": "create-task",
+          "subject": "launch-follow-up"
+        }
+      ],
+      "work_items": [
+        {
+          "work_item": {
+            "schema_version": "hermes.ai_business_os.work_item.v1",
+            "manifest_version": 1,
+            "work_item_id": "work-004",
+            "title": "Confirm launch readiness owners",
+            "owner": "chief_of_staff",
+            "effect_level": "R1",
+            "acceptance_criteria": ["Owners confirm scope", "Open risks are recorded"],
+            "idempotency_key": "work-004-v1",
+            "audit_ref": "audit:work-004",
+            "status": "ready",
+            "priority": "P2",
+            "evidence_refs": []
+          },
+          "kanban_dependencies": ["t_launch003"]
+        }
+      ]
+    },
+    {
+      "meeting_id": "meeting-005",
+      "title": "Weekly leadership sync",
+      "meeting_date": "2026-09-05",
+      "decisions": [
+        {
+          "schema_version": "hermes.ai_business_os.decision_record.v1",
+          "manifest_version": 1,
+          "decision_id": "decision-005",
+          "owner": "chief_of_staff",
+          "approver": "chief_of_staff",
+          "review_date": "2026-09-05",
+          "decision": "approved",
+          "subject": "leadership-follow-up",
+          "rationale": "A bounded follow-up is needed before the next sync."
+        }
+      ],
+      "action_requests": [
+        {
+          "schema_version": "hermes.ai_business_os.action_request.v1",
+          "manifest_version": 1,
+          "request_id": "action-005",
+          "owner": "chief_of_staff",
+          "effect_level": "R2",
+          "preview": {"target": "feishu_task", "operation": "create"},
+          "rollback": {"operation": "delete_preview", "required": true},
+          "approvers": ["chief_of_staff"],
+          "idempotency_key": "action-005-v1",
+          "audit_ref": "audit:action-005",
+          "action": "create-task",
+          "subject": "leadership-follow-up"
+        }
+      ],
+      "work_items": [
+        {
+          "work_item": {
+            "schema_version": "hermes.ai_business_os.work_item.v1",
+            "manifest_version": 1,
+            "work_item_id": "work-005",
+            "title": "Prepare the next leadership decision pack",
+            "owner": "chief_of_staff",
+            "effect_level": "R2",
+            "acceptance_criteria": ["Decision options are listed", "Evidence is linked"],
+            "idempotency_key": "work-005-v1",
+            "audit_ref": "audit:work-005",
+            "status": "ready",
+            "priority": "P1",
+            "evidence_refs": ["evidence-005"]
+          },
+          "due_date": "2026-09-09",
+          "kanban_dependencies": ["t_parent001"]
+        }
+      ]
+    }
+  ]
+}

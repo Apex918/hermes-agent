@@ -1,0 +1,36 @@
+{
+  "task_id": "t_2c57de7f",
+  "title": "N7 meeting minutes to Feishu Task proof of life",
+  "base_parent_commit": "283018b5565a032d34d6fd163513e0b9dc16ac63",
+  "changed_files": [
+    "business/ai_business_os/meeting_task_pol.py",
+    "business/ai_business_os/fixtures/meeting-minutes.v1.json",
+    "business/ai_business_os/__init__.py",
+    "tests/business/test_meeting_task_pol.py",
+    "N7-meeting-task-pol.md"
+  ],
+  "fixture_examples": 5,
+  "record_counts": {
+    "decision_records": 5,
+    "action_requests": 5,
+    "work_items": 5
+  },
+  "preview_status_counts": {
+    "preview": 3,
+    "needs_input": 2
+  },
+  "safety": {
+    "network_allowed": false,
+    "external_side_effects": false,
+    "production_write": false,
+    "approval_level": "R2",
+    "duplicate_preview_suppression": true
+  },
+  "verification": {
+    "targeted_tests": "7 passed",
+    "business_tests": "107 passed",
+    "ruff": "clean",
+    "compileall": "passed",
+    "fixture_json": "valid"
+  }
+}

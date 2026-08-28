@@ -1,0 +1,24 @@
+{
+  "schema": "ai-native-pol-replay-bundle-manifest/v1",
+  "task_id": "t_c170aaba",
+  "read_only": true,
+  "network_allowed": false,
+  "external_side_effects": false,
+  "sources": {
+    "n6_daily_report": {"path": "inputs/n6-daily-report.json", "sha256": "08b67c983d611918c8e523b7f1b5178edd21a6efabe68f8dc9cf3f5c4889306a"},
+    "n7_meeting_fixture": {"path": "inputs/n7-meeting-minutes.v1.json", "sha256": "33df2ab6ff1180675ba9a86ccb134282e88ea4804acd072bbf9c294461461f2d"},
+    "n7_manifest": {"path": "inputs/n7-manifest.json", "sha256": "5e7a684826fe2c9e6e13416151bd78c489d93e4548abe3f8f024f4cd5d9476d1"},
+    "n8a_golden_cases_parent": {"path": "parent attachment t_aa5d1e92/golden_cases.json", "sha256": "608c8bba84faf0a5cfa7e917692a7c3e2b1afe8b1852b2ec3e1ed46dbb22d501"}
+  },
+  "verification": {
+    "n6_fact_count": 35,
+    "n7_preview_status_counts": {"preview": 3, "needs_input": 2},
+    "n8a_cases": 4,
+    "n8a_expected": {"passed": 1, "blocked": 3, "failed": 0}
+  },
+  "commands": [
+    "python3 -m unittest -v test_replay_bundle.py",
+    "python3 replay_bundle.py --out replay-report.json",
+    "python3 -m json.tool replay-report.json >/dev/null"
+  ]
+}

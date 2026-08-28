@@ -33,6 +33,16 @@ from .feishu_adapter import (
     ProductionWriteDisabled,
     WebhookIngressDisabled,
 )
+from .meeting_task_pol import (
+    KANBAN_TASK_ID,
+    MEETING_FIXTURE_SCHEMA,
+    MeetingFixtureValidationError,
+    MeetingMinutes,
+    MeetingMinutesExtractor,
+    MeetingMinutesTaskPlanner,
+    MeetingWorkItem,
+    TaskCreationPreview,
+)
 from .gate import (
     ApprovalError,
     ApprovalReceipt,
@@ -94,6 +104,13 @@ __all__ = [
     "FakeProvider",
     "FakeTwentyCRMProvider",
     "FakeTwentyProvider",
+    "KANBAN_TASK_ID",
+    "MEETING_FIXTURE_SCHEMA",
+    "MeetingFixtureValidationError",
+    "MeetingMinutes",
+    "MeetingMinutesExtractor",
+    "MeetingMinutesTaskPlanner",
+    "MeetingWorkItem",
     "OfflineFeishuEventStore",
     "OperationNotFoundError",
     "ProductionWriteDisabled",
@@ -101,6 +118,7 @@ __all__ = [
     "ReleaseShadowGate",
     "RolePack",
     "ShadowOnlyResult",
+    "TaskCreationPreview",
     "TwentySandboxProof",
     "TwentySandboxProvider",
     "WorkItem",

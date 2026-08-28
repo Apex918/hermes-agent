@@ -1,0 +1,248 @@
+{
+  "schema": "daily-operations-cockpit/v1",
+  "report_date": "2026-08-28",
+  "generated_at": "2026-08-28T04:49:50.784634+00:00",
+  "read_only": true,
+  "sections": {
+    "today_focus": [
+      {
+        "text": "飞书任务：做一个虚拟美少女助理",
+        "source": "feishu.task",
+        "source_id": "8d3f33f6-7841-4445-9d6e-476249b02d1e",
+        "severity": "info"
+      },
+      {
+        "text": "飞书任务：搭建 Richman → Richbot 协作链路",
+        "source": "feishu.task",
+        "source_id": "8b548f20-6055-45f3-b5e8-80890f91f820",
+        "severity": "info"
+      },
+      {
+        "text": "飞书任务：护眼眼神",
+        "source": "feishu.task",
+        "source_id": "cd30a6f6-1942-4308-b86b-ecf9565fb84e",
+        "severity": "info"
+      },
+      {
+        "text": "飞书任务：活的轻松一点",
+        "source": "feishu.task",
+        "source_id": "514927b6-d227-496a-b2c8-774c1fd621e1",
+        "severity": "info"
+      },
+      {
+        "text": "飞书任务：hk 公司国际化",
+        "source": "feishu.task",
+        "source_id": "a76f1cf4-5128-49cf-8844-c3c2b1c5fc96",
+        "severity": "info"
+      },
+      {
+        "text": "飞书任务：短剧文化传媒",
+        "source": "feishu.task",
+        "source_id": "d2aa9e0c-f93a-4839-8519-77c9c586e6f4",
+        "severity": "info"
+      },
+      {
+        "text": "飞书任务：40 退休",
+        "source": "feishu.task",
+        "source_id": "ec2bca2a-c0e6-438f-b4b1-f464294da15c",
+        "severity": "info"
+      },
+      {
+        "text": "飞书任务：prompt 交易",
+        "source": "feishu.task",
+        "source_id": "bc098b85-77c9-4ff0-8536-2b20420a40a1",
+        "severity": "info"
+      },
+      {
+        "text": "飞书任务：AI 企业",
+        "source": "feishu.task",
+        "source_id": "1cacd7ad-1cf6-4d52-a815-5784a3dc6033",
+        "severity": "info"
+      },
+      {
+        "text": "飞书任务：买别墅",
+        "source": "feishu.task",
+        "source_id": "53f49d2e-4db8-404f-b2d0-b3d07bb91041",
+        "severity": "info"
+      },
+      {
+        "text": "飞书任务：买深圳房子",
+        "source": "feishu.task",
+        "source_id": "72bdb918-cc34-404d-ad8a-1aff9f01d66a",
+        "severity": "info"
+      },
+      {
+        "text": "飞书任务：au nz prv",
+        "source": "feishu.task",
+        "source_id": "417b1c30-10ff-4551-a507-d3e7a900d64f",
+        "severity": "info"
+      },
+      {
+        "text": "飞书任务：日本旅游",
+        "source": "feishu.task",
+        "source_id": "31363632-fd85-4c8d-beaf-b91f62ebe4f2",
+        "severity": "info"
+      },
+      {
+        "text": "飞书任务：养娃",
+        "source": "feishu.task",
+        "source_id": "3167fe4d-3fe1-464e-8817-9d4d5cef51f3",
+        "severity": "info"
+      },
+      {
+        "text": "飞书任务：每周至少一次户外",
+        "source": "feishu.task",
+        "source_id": "290745de-ab88-4961-a430-afd70d76ed0f",
+        "severity": "info"
+      },
+      {
+        "text": "飞书任务：体态练背 脸部塑形",
+        "source": "feishu.task",
+        "source_id": "bcdc0763-0573-446e-87ef-fcf9c1feb2d2",
+        "severity": "info"
+      },
+      {
+        "text": "飞书任务：ai 量化交易",
+        "source": "feishu.task",
+        "source_id": "52bafd30-5116-4bc3-9367-40141cf4b964",
+        "severity": "info"
+      },
+      {
+        "text": "飞书任务：香港工作",
+        "source": "feishu.task",
+        "source_id": "8fa26085-9130-4291-bc0b-e1c6171c6c4f",
+        "severity": "info"
+      },
+      {
+        "text": "飞书任务：自我进化运行的个人ai智能体",
+        "source": "feishu.task",
+        "source_id": "1644cee4-ec09-4396-9ca6-a88197e1cf00",
+        "severity": "info"
+      },
+      {
+        "text": "Kanban：N6 实现每日经营驾驶舱 PoL（running）",
+        "source": "hermes.kanban",
+        "source_id": "t_c0eb05fc",
+        "severity": "info"
+      },
+      {
+        "text": "Kanban：N7 实现会议纪要到飞书任务的 PoL（running）",
+        "source": "hermes.kanban",
+        "source_id": "t_2c57de7f",
+        "severity": "info"
+      },
+      {
+        "text": "Kanban：N8 建立 AI Native 运营控制塔与评估集（todo）",
+        "source": "hermes.kanban",
+        "source_id": "t_aa5d1e92",
+        "severity": "info"
+      },
+      {
+        "text": "Kanban：N9 建立财务、客户、HR 敏感数据门禁（running）",
+        "source": "hermes.kanban",
+        "source_id": "t_d53729e4",
+        "severity": "info"
+      },
+      {
+        "text": "Kanban：N10 运行 P0 端到端 shadow/release 验收（todo）",
+        "source": "hermes.kanban",
+        "source_id": "t_ee213945",
+        "severity": "info"
+      }
+    ],
+    "overdue_or_blocked": [
+      {
+        "text": "逾期任务：晚间复盘（截止 2026-08-20）",
+        "source": "feishu.task",
+        "source_id": "4010de03-c930-4352-b208-a6c1a9efcaec",
+        "severity": "high"
+      },
+      {
+        "text": "逾期任务：护眼 + 颈肩放松（截止 2026-08-20）",
+        "source": "feishu.task",
+        "source_id": "8e0ad0db-fe0c-4a07-9790-2aafe8ac8a38",
+        "severity": "high"
+      },
+      {
+        "text": "逾期任务：练背 + 腹核心 + 姿态矫正（截止 2026-08-20）",
+        "source": "feishu.task",
+        "source_id": "4e3fe2d5-e73f-467c-bbe1-79a595679e05",
+        "severity": "high"
+      },
+      {
+        "text": "逾期任务：晨间护眼（截止 2026-08-20）",
+        "source": "feishu.task",
+        "source_id": "4fc7a811-b279-403f-899c-00c506993ee1",
+        "severity": "high"
+      },
+      {
+        "text": "逾期任务：简历 / 作品集 / 投递（截止 2026-08-19）",
+        "source": "feishu.task",
+        "source_id": "e3aa9f23-6a10-4235-bd7c-9eb5390803ef",
+        "severity": "high"
+      },
+      {
+        "text": "逾期任务：香港 AI Agent 岗位研究（截止 2026-08-19）",
+        "source": "feishu.task",
+        "source_id": "34aca551-aced-468c-acfe-5c3e423712e7",
+        "severity": "high"
+      }
+    ],
+    "decisions": [
+      {
+        "text": "待决策：N1 定义 EvidenceEnvelope、DecisionRecord、ActionRequest、WorkItem 合同",
+        "source": "hermes.kanban",
+        "source_id": "t_ea63f925",
+        "severity": "medium"
+      },
+      {
+        "text": "待决策：N2 实现 R2/R3 receipt-gated apply-once 审批状态机",
+        "source": "hermes.kanban",
+        "source_id": "t_a7f4a6c7",
+        "severity": "medium"
+      }
+    ],
+    "risks": [
+      {
+        "text": "未发现来源记录标记的阻塞；仍需人工检查外部依赖",
+        "source": "derived.cockpit",
+        "source_id": "",
+        "severity": "info"
+      }
+    ],
+    "action_recommendations": [
+      {
+        "text": "先处理逾期/阻塞项：明确 owner、下一步和解除条件",
+        "source": "derived.cockpit",
+        "source_id": "",
+        "severity": "high"
+      },
+      {
+        "text": "对每个待决策项补齐决策人、截止时间和审批记录",
+        "source": "derived.cockpit",
+        "source_id": "",
+        "severity": "medium"
+      }
+    ]
+  },
+  "evidence_policy": "Every factual item has source and source_id; derived fallbacks are labeled derived.cockpit.",
+  "write_preview": {
+    "production_write": false,
+    "approval_required": true,
+    "feishu": {
+      "operation": "create_task_preview",
+      "payload": {
+        "summary": "Daily cockpit 2026-08-28",
+        "description": "{\"schema\": \"daily-operations-cockpit/v1\", \"report_date\": \"2026-08-28\", \"generated_at\": \"2026-08-28T04:49:50.784634+00:00\", \"read_only\": true, \"sections\": {\"today_focus\": [{\"text\": \"飞书任务：做一个虚拟美少女助理\", \"source\": \"feishu.task\", \"source_id\": \"8d3f33f6-7841-4445-9d6e-476249b02d1e\", \"severity\": \"info\"}, {\"text\": \"飞书任务：搭建 Richman → Richbot 协作链路\", \"source\": \"feishu.task\", \"source_id\": \"8b548f20-6055-45f3-b5e8-80890f91f820\", \"severity\": \"info\"}, {\"text\": \"飞书任务：护眼眼神\", \"source\": \"feishu.task\", \"source_id\": \"cd30a6f6-1942-4308-b86b-ecf9565fb84e\", \"severity\": \"info\"}, {\"text\": \"飞书任务：活的轻松一点\", \"source\": \"feishu.task\", \"source_id\": \"514927b6-d227-496a-b2c8-774c1fd621e1\", \"severity\": \"info\"}, {\"text\": \"飞书任务：hk 公司国际化\", \"source\": \"feishu.task\", \"source_id\": \"a76f1cf4-5128-49cf-8844-c3c2b1c5fc96\", \"severity\": \"info\"}, {\"text\": \"飞书任务：短剧文化传媒\", \"source\": \"feishu.task\", \"source_id\": \"d2aa9e0c-f93a-4839-8519-77c9c586e6f4\", \"severity\": \"info\"}, {\"text\": \"飞书任务：40 退休\", \"source\": \"feishu.task\", \"source_id\": \"ec2bca2a-c0e6-438f-b4b1-f464294da15c\", \"severity\": \"info\"}, {\"text\": \"飞书任务：prompt 交易\", \"source\": \"feishu.task\", \"source_id\": \"bc098b85-77c9-4ff0-8536-2b20420a40a1\", \"severity\": \"info\"}, {\"text\": \"飞书任务：AI 企业\", \"source\": \"feishu.task\", \"source_id\": \"1cacd7ad-1cf6-4d52-a815-5784a3dc6033\", \"severity\": \"info\"}, {\"text\": \"飞书任务：买别墅\", \"source\": \"feishu.task\", \"source_id\": \"53f49d2e-4db8-404f-b2d0-b3d07bb91041\", \"severity\": \"info\"}, {\"text\": \"飞书任务：买深圳房子\", \"source\": \"feishu.task\", \"source_id\": \"72bdb918-cc34-404d-ad8a-1aff9f01d66a\", \"severity\": \"info\"}, {\"text\": \"飞书任务：au nz prv\", \"source\": \"feishu.task\", \"source_id\": \"417b1c30-10ff-4551-a507-d3e7a900d64f\", \"severity\": \"info\"}, {\"text\": \"飞书任务：日本旅游\", \"source\": \"feishu.task\", \"source_id\": \"31363632-fd85-4c8d-beaf-b91f62ebe4f2\", \"severity\": \"info\"}, {\"text\": \"飞书任务：养娃\", \"source\": \"feishu.task\", \"source_id\": \"3167fe4d-3fe1-464e-8817-9d4d5cef51f3\", \"severity\": \"info\"}, {\"text\": \"飞书任务：每周至少一次户外\", \"source\": \"feishu.task\", \"source_id\": \"290745de-ab88-4961-a430-afd70d76ed0f\", \"severity\": \"info\"}, {\"text\": \"飞书任务：体态练背 脸部塑形\", \"source\": \"feishu.task\", \"source_id\": \"bcdc0763-0573-446e-87ef-fcf9c1feb2d2\", \"severity\": \"info\"}, {\"text\": \"飞书任务：ai 量化交易\", \"source\": \"feishu.task\", \"source_id\": \"52bafd30-5116-4bc3-9367-40141cf4b964\", \"severity\": \"info\"}, {\"text\": \"飞书任务：香港工作\", \"source\": \"feishu.task\", \"source_id\": \"8fa26085-9130-4291-bc0b-e1c6171c6c4f\", \"severity\": \"info\"}, {\"text\": \"飞书任务：自我进化运行的个人ai智能体\", \"source\": \"feishu.task\", \"source_id\": \"1644cee4-ec09-4396-9ca6-a88197e1cf00\", \"severity\": \"info\"}, {\"text\": \"Kanban：N6 实现每日经营驾驶舱 PoL（running）\", \"source\": \"hermes.kanban\", \"source_id\": \"t_c0eb05fc\", \"severity\": \"info\"}, {\"text\": \"Kanban：N7 实现会议纪要到飞书任务的 PoL（running）\", \"source\": \"hermes.kanban\", \"source_id\": \"t_2c57de7f\", \"severity\": \"info\"}, {\"text\": \"Kanban：N8 建立 AI Native 运营控制塔与评估集（todo）\", \"source\": \"hermes.kanban\", \"source_id\": \"t_aa5d1e92\", \"severity\": \"info\"}, {\"text\": \"Kanban：N9 建立财务、客户、HR 敏感数据门禁（running）\", \"source\": \"hermes.kanban\", \"source_id\": \"t_d53729e4\", \"severity\": \"info\"}, {\"text\": \"Kanban：N10 运行 P0 端到端 shadow/release 验收（todo）\", \"source\": \"hermes.kanban\", \"source_id\": \"t_ee213945\", \"severity\": \"info\"}], \"overdue_or_blocked\": [{\"text\": \"逾期任务：晚间复盘（截止 2026-08-20）\", \"source\": \"feishu.task\", \"source_id\": \"4010de03-c930-4352-b208-a6c1a9efcaec\", \"severity\": \"high\"}, {\"text\": \"逾期任务：护眼 + 颈肩放松（截止 2026-08-20）\", \"source\": \"feishu.task\", \"source_id\": \"8e0ad0db-fe0c-4a07-9790-2aafe8ac8a38\", \"severity\": \"high\"}, {\"text\": \"逾期任务：练背 + 腹核心 + 姿态矫正（截止 2026-08-20）\", \"source\": \"feishu.task\", \"source_id\": \"4e3fe2d5-e73f-467c-bbe1-79a595679e05\", \"severity\": \"high\"}, {\"text\": \"逾期任务：晨间护眼（截止 2026-08-20）\", \"source\": \"feishu.task\", \"source_id\": \"4fc7a811-b279-403f-899c-00c506993ee1\", \"severity\": \"high\"}, {\"text\": \"逾期任务：简历 / 作品集 / 投递（截止 2026-08-19）\", \"source\": \"feishu.task\", \"source_id\": \"e3aa9f23-6a10-4235-bd7c-9eb5390803ef\", \"severity\": \"high\"}, {\"text\": \"逾期任务：香港 AI Agent 岗位研究（截止 2026-08-19）\", \"source\": \"feishu.task\", \"source_id\": \"34aca551-aced-468c-acfe-5c3e423712e7\", \"severity\": \"high\"}], \"decisions\": [{\"text\": \"待决策：N1 定义 EvidenceEnvelope、DecisionRecord、ActionRequest、WorkItem 合同\", \"source\": \"hermes.kanban\", \"source_id\": \"t_ea63f925\", \"severity\": \"medium\"}, {\"text\": \"待决策：N2 实现 R2/R3 receipt-gated apply-once 审批状态机\", \"source\": \"hermes.kanban\", \"source_id\": \"t_a7f4a6c7\", \"severity\": \"medium\"}], \"risks\": [{\"text\": \"未发现来源记录标记的阻塞；仍需人工检查外部依赖\", \"source\": \"derived.cockpit\", \"source_id\": \"\", \"severity\": \"info\"}], \"action_recommendations\": [{\"text\": \"先处理逾期/阻塞项：明确 owner、下一步和解除条件\", \"source\": \"derived.cockpit\", \"source_id\": \"\", \"severity\": \"high\"}, {\"text\": \"对每个待决策项补齐决策人、截止时间和审批记录\", \"source\": \"derived.cockpit\", \"source_id\": \"\", \"severity\": \"medium\"}]}, \"evidence_policy\": \"Every factual item has source and source_id; derived fallbacks are labeled derived.cockpit.\"}",
+        "idempotency_key": "7ab358ecb4cafc386f22b7684f0a293d05921e120e55d5b2923cf1a8ae9f6d3f"
+      }
+    },
+    "ima": {
+      "operation": "archive_preview",
+      "payload": {
+        "title": "Daily cockpit 2026-08-28",
+        "report_sha256": "7ab358ecb4cafc386f22b7684f0a293d05921e120e55d5b2923cf1a8ae9f6d3f"
+      }
+    }
+  }
+}

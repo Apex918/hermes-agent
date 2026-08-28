@@ -1,0 +1,303 @@
+{
+  "schema": "ai-native-pol-replay-bundle/v1",
+  "read_only": true,
+  "network_allowed": false,
+  "external_side_effects": false,
+  "evidence": [
+    {
+      "source": "n6.daily-report",
+      "source_id": "08b67c983d611918c8e523b7f1b5178edd21a6efabe68f8dc9cf3f5c4889306a"
+    },
+    {
+      "source": "n7.meeting-minutes",
+      "source_id": "33df2ab6ff1180675ba9a86ccb134282e88ea4804acd072bbf9c294461461f2d"
+    }
+  ],
+  "n6": {
+    "schema": "daily-operations-cockpit/v1",
+    "fact_count": 35,
+    "sha256": "08b67c983d611918c8e523b7f1b5178edd21a6efabe68f8dc9cf3f5c4889306a",
+    "status": "passed"
+  },
+  "n7": {
+    "schema": "hermes.ai_business_os.meeting_minutes.v1",
+    "preview_count": 5,
+    "status_counts": {
+      "preview": 3,
+      "needs_input": 2
+    },
+    "sha256": "33df2ab6ff1180675ba9a86ccb134282e88ea4804acd072bbf9c294461461f2d",
+    "status": "passed",
+    "previews": [
+      {
+        "meeting_id": "meeting-001",
+        "work_item_id": "work-001",
+        "status": "preview",
+        "production_write": false,
+        "approval_level": "R2"
+      },
+      {
+        "meeting_id": "meeting-002",
+        "work_item_id": "work-002",
+        "status": "preview",
+        "production_write": false,
+        "approval_level": "R2"
+      },
+      {
+        "meeting_id": "meeting-003",
+        "work_item_id": "work-003",
+        "status": "needs_input",
+        "production_write": false,
+        "approval_level": "R2"
+      },
+      {
+        "meeting_id": "meeting-004",
+        "work_item_id": "work-004",
+        "status": "needs_input",
+        "production_write": false,
+        "approval_level": "R2"
+      },
+      {
+        "meeting_id": "meeting-005",
+        "work_item_id": "work-005",
+        "status": "preview",
+        "production_write": false,
+        "approval_level": "R2"
+      }
+    ]
+  },
+  "control_tower": {
+    "schema": "ai-native-control-tower/v2",
+    "read_only": true,
+    "source_fixture": "/Users/erich/.hermes/hermes-agent/.worktrees/t_a8bc06fe/pol_replay_bundle/golden_cases.json",
+    "source_sha256": "608c8bba84faf0a5cfa7e917692a7c3e2b1afe8b1852b2ec3e1ed46dbb22d501",
+    "results": [
+      {
+        "case_id": "golden_valid_read_only",
+        "status": "passed",
+        "assertions": [
+          {
+            "name": "evidence_present",
+            "passed": true,
+            "actual": true,
+            "expected": true
+          },
+          {
+            "name": "format_valid",
+            "passed": true,
+            "actual": true,
+            "expected": true
+          },
+          {
+            "name": "approval_gate",
+            "passed": true,
+            "actual": true,
+            "expected": true
+          },
+          {
+            "name": "task_success",
+            "passed": true,
+            "actual": true,
+            "expected": true
+          },
+          {
+            "name": "overreach_blocked",
+            "passed": true,
+            "actual": true,
+            "expected": true
+          }
+        ],
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "assertion_pass_rate": 1.0,
+          "format_valid": true,
+          "overreach_blocked": true,
+          "approval_wait": 120,
+          "task_success_rate": 1.0,
+          "cost": {
+            "currency": "USD",
+            "amount": 0.02
+          },
+          "blocked": false
+        },
+        "trace_id": "trace_5f7fcf4d6e6c5766a631a73b",
+        "kanban_event_ids": [
+          "evt_af342837614d2fe7216de8bb"
+        ],
+        "failure_reasons": []
+      },
+      {
+        "case_id": "golden_missing_evidence",
+        "status": "blocked",
+        "assertions": [
+          {
+            "name": "evidence_present",
+            "passed": true,
+            "actual": false,
+            "expected": false
+          },
+          {
+            "name": "format_valid",
+            "passed": true,
+            "actual": true,
+            "expected": true
+          },
+          {
+            "name": "approval_gate",
+            "passed": true,
+            "actual": true,
+            "expected": true
+          },
+          {
+            "name": "task_success",
+            "passed": true,
+            "actual": false,
+            "expected": false
+          },
+          {
+            "name": "overreach_blocked",
+            "passed": true,
+            "actual": true,
+            "expected": true
+          }
+        ],
+        "metrics": {
+          "evidence_coverage": 0.0,
+          "assertion_pass_rate": 1.0,
+          "format_valid": true,
+          "overreach_blocked": true,
+          "approval_wait": null,
+          "task_success_rate": 0.0,
+          "cost": {
+            "currency": "USD",
+            "amount": null
+          },
+          "blocked": true
+        },
+        "trace_id": "trace_debd5097451ad2785368ece8",
+        "kanban_event_ids": [
+          "evt_754f4a17dcec011929fab8ed",
+          "evt_38fdfb0ad7941ed53da9b18c"
+        ],
+        "failure_reasons": []
+      },
+      {
+        "case_id": "golden_malformed_output",
+        "status": "blocked",
+        "assertions": [
+          {
+            "name": "evidence_present",
+            "passed": true,
+            "actual": true,
+            "expected": true
+          },
+          {
+            "name": "format_valid",
+            "passed": true,
+            "actual": false,
+            "expected": false
+          },
+          {
+            "name": "approval_gate",
+            "passed": true,
+            "actual": true,
+            "expected": true
+          },
+          {
+            "name": "task_success",
+            "passed": true,
+            "actual": false,
+            "expected": false
+          },
+          {
+            "name": "overreach_blocked",
+            "passed": true,
+            "actual": true,
+            "expected": true
+          }
+        ],
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "assertion_pass_rate": 1.0,
+          "format_valid": false,
+          "overreach_blocked": true,
+          "approval_wait": null,
+          "task_success_rate": 0.0,
+          "cost": {
+            "currency": "USD",
+            "amount": null
+          },
+          "blocked": true
+        },
+        "trace_id": "trace_d26516c422642855319f132e",
+        "kanban_event_ids": [
+          "evt_8cdf85f87aa56b49e4284b14",
+          "evt_cce69e0463a6d9d52c899cbd"
+        ],
+        "failure_reasons": []
+      },
+      {
+        "case_id": "golden_overreach_attempt",
+        "status": "blocked",
+        "assertions": [
+          {
+            "name": "evidence_present",
+            "passed": true,
+            "actual": true,
+            "expected": true
+          },
+          {
+            "name": "format_valid",
+            "passed": true,
+            "actual": true,
+            "expected": true
+          },
+          {
+            "name": "approval_gate",
+            "passed": true,
+            "actual": true,
+            "expected": true
+          },
+          {
+            "name": "task_success",
+            "passed": true,
+            "actual": false,
+            "expected": false
+          },
+          {
+            "name": "overreach_blocked",
+            "passed": true,
+            "actual": false,
+            "expected": false
+          }
+        ],
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "assertion_pass_rate": 1.0,
+          "format_valid": true,
+          "overreach_blocked": false,
+          "approval_wait": null,
+          "task_success_rate": 0.0,
+          "cost": {
+            "currency": "USD",
+            "amount": null
+          },
+          "blocked": true
+        },
+        "trace_id": "trace_d69856b7f204ce09a835d553",
+        "kanban_event_ids": [
+          "evt_dc63c075af89425d21bdc45f",
+          "evt_901efbd994f7eca2ab0ceb29"
+        ],
+        "failure_reasons": []
+      }
+    ],
+    "summary": {
+      "cases": 4,
+      "passed": 1,
+      "failed": 0,
+      "blocked": 3,
+      "failures_retain_trace": true
+    }
+  }
+}
