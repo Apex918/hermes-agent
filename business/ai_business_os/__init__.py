@@ -3,7 +3,13 @@
 from . import validator
 from .adapters import ReadOnlyAdapter
 from .approval_state_machine import ApprovalOutcome, ApprovalPlan, ApprovalStateMachine
-from .contracts import ActionRequest, DecisionRecord, EvidenceEnvelope
+from .contracts import (
+    ActionRequest,
+    ContractValidationError,
+    DecisionRecord,
+    EvidenceEnvelope,
+    WorkItem,
+)
 from .crm_provider import CRMCommitResult, CRMProvider, CRMWriteProposal
 from .cto_agent import CTOAgent, build_cto_agent
 from .gate import (
@@ -47,6 +53,7 @@ __all__ = [
     "CRMWriteProposal",
     "ConnectorAllowlist",
     "ConnectorNotAllowedError",
+    "ContractValidationError",
     "CTOAgent",
     "DEFAULT_TWENTY_FIXTURE_PATH",
     "DecisionRecord",
@@ -61,6 +68,7 @@ __all__ = [
     "ShadowOnlyResult",
     "TwentySandboxProof",
     "TwentySandboxProvider",
+    "WorkItem",
     "build_all_role_packs",
     "build_cto_agent",
     "build_p0_role_packs",
