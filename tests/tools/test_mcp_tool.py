@@ -576,6 +576,42 @@ class TestToolHandler:
         finally:
             _servers.pop("test_srv", None)
 
+    def test_stdio_watchdog_probe_does_not_leak_coroutine(self):
+        import gc
+        import warnings
+
+        from tools.mcp_tool import _make_tool_handler, _servers
+
+        mock_session = MagicMock()
+        mock_session.call_tool = AsyncMock(
+            return_value=_make_call_result("hello world", is_error=False)
+        )
+        server = _make_mock_server("test_srv", session=mock_session)
+
+        async def _watch_children(_server):
+            return
+
+        _servers["test_srv"] = server
+
+        try:
+            handler = _make_tool_handler("test_srv", "greet", 120)
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                with patch.object(type(server), "_watch_stdio_children", _watch_children):
+                    with self._patch_mcp_loop():
+                        result = json.loads(handler({"name": "world"}))
+                gc.collect()
+
+            assert result["result"] == "hello world"
+            assert [
+                warning
+                for warning in caught
+                if issubclass(warning.category, RuntimeWarning)
+                and "was never awaited" in str(warning.message)
+            ] == []
+        finally:
+            _servers.pop("test_srv", None)
+
 
     def test_recycled_stdio_server_reconnects_lazily_on_tool_call(self):
         from tools.mcp_tool import _make_tool_handler, _servers
