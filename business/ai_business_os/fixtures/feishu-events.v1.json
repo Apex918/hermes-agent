@@ -1,0 +1,143 @@
+{
+  "schema_version": "hermes.ai_business_os.feishu_events.v1",
+  "manifest_version": 1,
+  "network_policy": {
+    "network_allowed": false,
+    "external_side_effects": false,
+    "source": "checked-in-local-fixture"
+  },
+  "scope": {
+    "tenant_id": "tenant-fixture-a",
+    "profile": "feishu-offline",
+    "workspace_id": "workspace-fixture-a",
+    "workspace_path": "tenant-fixture-a/feishu-offline"
+  },
+  "sensitive_fields": {
+    "app_secret": "fixture-app-secret-do-not-use",
+    "encrypt_key": "fixture-encrypt-key-do-not-use",
+    "verification_token": "fixture-verification-token-do-not-use",
+    "access_token": "fixture-access-token-do-not-use"
+  },
+  "events": [
+    {
+      "kind": "im",
+      "event_type": "im.message.receive_v1",
+      "event_id": "evt-im-fixture-001",
+      "idempotency_key": "feishu:tenant-fixture-a:im.message.receive_v1:evt-im-fixture-001",
+      "tenant_id": "tenant-fixture-a",
+      "profile": "feishu-offline",
+      "workspace_id": "workspace-fixture-a",
+      "workspace_path": "tenant-fixture-a/feishu-offline",
+      "artifact_path": "tenant-fixture-a/feishu-offline/im/evt-im-fixture-001.json",
+      "payload": {
+        "message_type": "text",
+        "raw_content": "{\"text\":\"offline IM fixture: approve the bounded plan\"}",
+        "message_id": "om_fixture_im_001",
+        "chat_id": "oc_fixture_001",
+        "sender_open_id": "ou_fixture_user"
+      }
+    },
+    {
+      "kind": "document_comment",
+      "event_type": "drive.notice.comment_add_v1",
+      "event_id": "evt-comment-fixture-001",
+      "idempotency_key": "feishu:tenant-fixture-a:drive.notice.comment_add_v1:evt-comment-fixture-001",
+      "tenant_id": "tenant-fixture-a",
+      "profile": "feishu-offline",
+      "workspace_id": "workspace-fixture-a",
+      "workspace_path": "tenant-fixture-a/feishu-offline",
+      "artifact_path": "tenant-fixture-a/feishu-offline/document-comments/evt-comment-fixture-001.json",
+      "payload": {
+        "event": {
+          "event_id": "evt-comment-fixture-001",
+          "comment_id": "comment_fixture_001",
+          "reply_id": "reply_fixture_001",
+          "is_mentioned": true,
+          "timestamp": "1787875200",
+          "notice_meta": {
+            "file_token": "docx_fixture_token",
+            "file_type": "docx",
+            "notice_type": "add_reply",
+            "from_user_id": {"open_id": "ou_fixture_user"},
+            "to_user_id": {"open_id": "ou_fixture_bot"}
+          }
+        }
+      }
+    },
+    {
+      "kind": "card",
+      "event_type": "card.action.trigger",
+      "event_id": "evt-card-fixture-001",
+      "idempotency_key": "feishu:tenant-fixture-a:card.action.trigger:evt-card-fixture-001",
+      "tenant_id": "tenant-fixture-a",
+      "profile": "feishu-offline",
+      "workspace_id": "workspace-fixture-a",
+      "workspace_path": "tenant-fixture-a/feishu-offline",
+      "artifact_path": "tenant-fixture-a/feishu-offline/cards/evt-card-fixture-001.json",
+      "payload": {
+        "message_type": "interactive",
+        "raw_content": "{\"card\":{\"header\":{\"title\":{\"content\":\"Offline approval card\"}},\"elements\":[{\"tag\":\"markdown\",\"content\":\"Review bounded release\"},{\"tag\":\"action\",\"actions\":[{\"text\":{\"content\":\"Approve\"},\"value\":{\"decision\":\"approve\"}}]}]}}",
+        "open_id": "ou_fixture_user",
+        "action_value": {"decision": "approve"}
+      }
+    },
+    {
+      "kind": "task",
+      "event_type": "task.task.created_v1",
+      "event_id": "evt-task-fixture-001",
+      "idempotency_key": "feishu:tenant-fixture-a:task.task.created_v1:evt-task-fixture-001",
+      "tenant_id": "tenant-fixture-a",
+      "profile": "feishu-offline",
+      "workspace_id": "workspace-fixture-a",
+      "workspace_path": "tenant-fixture-a/feishu-offline",
+      "artifact_path": "tenant-fixture-a/feishu-offline/tasks/evt-task-fixture-001.json",
+      "payload": {
+        "task_id": "task_fixture_001",
+        "summary": "Verify release evidence",
+        "creator_open_id": "ou_fixture_user",
+        "assignee_open_id": "ou_fixture_owner",
+        "status": "todo"
+      }
+    },
+    {
+      "kind": "calendar",
+      "event_type": "calendar.calendar.event.created_v1",
+      "event_id": "evt-calendar-fixture-001",
+      "idempotency_key": "feishu:tenant-fixture-a:calendar.calendar.event.created_v1:evt-calendar-fixture-001",
+      "tenant_id": "tenant-fixture-a",
+      "profile": "feishu-offline",
+      "workspace_id": "workspace-fixture-a",
+      "workspace_path": "tenant-fixture-a/feishu-offline",
+      "artifact_path": "tenant-fixture-a/feishu-offline/calendar/evt-calendar-fixture-001.json",
+      "payload": {
+        "calendar_id": "cal_fixture_001",
+        "event_id": "cal_event_fixture_001",
+        "summary": "Evidence review",
+        "start_time": "2026-08-28T09:00:00+08:00",
+        "end_time": "2026-08-28T09:30:00+08:00",
+        "organizer_open_id": "ou_fixture_owner"
+      }
+    },
+    {
+      "kind": "base",
+      "event_type": "bitable.app.table.record_created_v1",
+      "event_id": "evt-base-fixture-001",
+      "idempotency_key": "feishu:tenant-fixture-a:bitable.app.table.record_created_v1:evt-base-fixture-001",
+      "tenant_id": "tenant-fixture-a",
+      "profile": "feishu-offline",
+      "workspace_id": "workspace-fixture-a",
+      "workspace_path": "tenant-fixture-a/feishu-offline",
+      "artifact_path": "tenant-fixture-a/feishu-offline/base/evt-base-fixture-001.json",
+      "payload": {
+        "app_token": "bascn_fixture_app",
+        "table_id": "tbl_fixture_001",
+        "record_id": "rec_fixture_001",
+        "fields": {
+          "Status": "Ready",
+          "Owner": "fixture-owner",
+          "EvidenceRef": "evidence-fixture-001"
+        }
+      }
+    }
+  ]
+}

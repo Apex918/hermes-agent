@@ -12,6 +12,15 @@ from .contracts import (
 )
 from .crm_provider import CRMCommitResult, CRMProvider, CRMWriteProposal
 from .cto_agent import CTOAgent, build_cto_agent
+from .feishu_fixtures import (
+    DEFAULT_FEISHU_FIXTURE_PATH,
+    EVENT_KINDS,
+    FeishuFixtureScope,
+    FeishuFixtureValidationError,
+    OfflineFeishuEventStore,
+    load_feishu_event_fixture,
+    redact_sensitive_fields,
+)
 from .gate import (
     ApprovalError,
     ApprovalReceipt,
@@ -55,12 +64,17 @@ __all__ = [
     "ConnectorNotAllowedError",
     "ContractValidationError",
     "CTOAgent",
+    "DEFAULT_FEISHU_FIXTURE_PATH",
     "DEFAULT_TWENTY_FIXTURE_PATH",
     "DecisionRecord",
+    "EVENT_KINDS",
+    "FeishuFixtureScope",
+    "FeishuFixtureValidationError",
     "EvidenceEnvelope",
     "FakeConnector",
     "FakeTwentyCRMProvider",
     "FakeTwentyProvider",
+    "OfflineFeishuEventStore",
     "OperationNotFoundError",
     "ReadOnlyAdapter",
     "ReleaseShadowGate",
@@ -75,6 +89,8 @@ __all__ = [
     "build_p1_sensitive_role_packs",
     "build_sensitive_role_packs",
     "build_twenty_sandbox_proof",
+    "load_feishu_event_fixture",
     "load_twenty_sandbox_fixture",
+    "redact_sensitive_fields",
     "validator",
 ]
