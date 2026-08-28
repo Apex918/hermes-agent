@@ -116,6 +116,38 @@ def _pending_dir(subsystem: str) -> Path:
     return get_hermes_home() / "pending" / subsystem
 
 
+def _approval_dir() -> Path:
+    """Durable approval ledger; unlike pending files it survives apply/reject."""
+    return get_hermes_home() / "approval"
+
+
+def _persist_approval_record(record: Dict[str, Any]) -> None:
+    """Atomically persist an approval result for later audit/readback."""
+    directory = _approval_dir()
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{record['id']}.json"
+    temporary = path.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(record, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    os.replace(temporary, path)
+
+
+def read_approval(identifier: str) -> Optional[Dict[str, Any]]:
+    """Read a staged or completed approval by id, audit reference, or idempotency key."""
+    candidates = list(_approval_dir().glob("*.json")) if _approval_dir().exists() else []
+    for subsystem in _SUBSYSTEMS:
+        pending = _pending_dir(subsystem) / f"{identifier}.json"
+        if pending.exists():
+            candidates.append(pending)
+    for path in candidates:
+        try:
+            record = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if identifier in {record.get("id"), record.get("audit_ref"), record.get("idempotency_key")}:
+            return record
+    return None
+
+
 def stage_write(
     subsystem: str,
     payload: Dict[str, Any],
@@ -178,6 +210,8 @@ def stage_write(
         "status": plan.status,
         "reason": plan.reason,
         "receipt": receipt or "",
+        "approval_receipt": receipt or "",
+        "state_history": list(plan.state_history),
     }
     if subsystem == SKILLS and not dry_run:
         try:
@@ -208,10 +242,11 @@ def _record_to_plan(record: Dict[str, Any]) -> ApprovalPlan:
         rollback=record.get("rollback", {}),
         audit_ref=record.get("audit_ref", ""),
         idempotency_key=record.get("idempotency_key", ""),
-        status=record.get("status", "pending"),
+        status=record.get("status", "pending_approval"),
         dry_run=bool(record.get("dry_run", False)),
         receipt=record.get("receipt", ""),
         reason=record.get("reason", ""),
+        state_history=tuple(record.get("state_history") or (record.get("status", "pending_approval"),)),
     )
 
 
@@ -228,7 +263,7 @@ def apply_pending(
     never invoked.
     """
     if record.get("dry_run"):
-        return {
+        result = {
             "success": False,
             "status": "rejected",
             "error": "dry-run records cannot be applied",
@@ -238,9 +273,65 @@ def apply_pending(
             "preview": record.get("preview", ""),
             "diff": record.get("diff", ""),
             "rollback": record.get("rollback", {}),
+            "state_history": ["dry_run", "rejected"],
         }
+        record.update(result)
+        _persist_approval_record(record)
+        return result
+
+    # The ledger is the process-independent idempotency boundary. A retry after
+    # a worker restart must return the recorded terminal result, not call effect.
+    previous = read_approval(record.get("id", ""))
+    if previous and previous.get("status") in {"applied", "failed"}:
+        result = {
+            "success": previous.get("status") == "applied",
+            "status": previous.get("status"),
+            "audit_ref": previous.get("audit_ref", ""),
+            "idempotency_key": previous.get("idempotency_key", ""),
+            "approval_level": previous.get("approval_level", "R1"),
+            "preview": previous.get("preview", ""),
+            "diff": previous.get("diff", ""),
+            "rollback": previous.get("rollback", {}),
+            "approval_receipt": previous.get("approval_receipt", ""),
+            "state_history": previous.get("state_history", []),
+            "result": previous.get("result"),
+            "error": previous.get("error", ""),
+            "idempotent": True,
+        }
+        record.update(previous)
+        if isinstance(previous.get("result"), dict):
+            result.update(previous["result"])
+        return result
     plan = _record_to_plan(record)
-    return DEFAULT_STATE_MACHINE.apply_once(plan, effect, receipt=receipt)
+
+    def mark_applying():
+        history = list(record.get("state_history") or [plan.status])
+        if history[-1] == "pending_approval":
+            history.append("approved")
+        if history[-1] != "applying":
+            history.append("applying")
+        record.update(
+            {
+                "status": "applying",
+                "state_history": history,
+                "approval_receipt": receipt or plan.receipt or "",
+            }
+        )
+        _persist_approval_record(record)
+        return effect()
+
+    result = DEFAULT_STATE_MACHINE.apply_once(plan, mark_applying, receipt=receipt)
+    record.update(
+        {
+            "status": result.get("status", "failed"),
+            "state_history": result.get("state_history", record.get("state_history", [])),
+            "approval_receipt": result.get("approval_receipt", receipt or ""),
+            "result": result.get("result"),
+            "error": result.get("error", ""),
+        }
+    )
+    _persist_approval_record(record)
+    return result
 
 
 def list_pending(subsystem: str) -> List[Dict[str, Any]]:
@@ -251,7 +342,9 @@ def list_pending(subsystem: str) -> List[Dict[str, Any]]:
     records: List[Dict[str, Any]] = []
     for p in d.glob("*.json"):
         try:
-            records.append(json.loads(p.read_text(encoding="utf-8")))
+            record = json.loads(p.read_text(encoding="utf-8"))
+            if record.get("status", "pending_approval") == "pending_approval":
+                records.append(record)
         except Exception:
             logger.warning("Skipping unreadable pending record: %s", p)
     records.sort(key=lambda r: r.get("created_at", 0))
@@ -279,6 +372,23 @@ def discard_pending(subsystem: str, pending_id: str) -> bool:
     except Exception as e:  # pragma: no cover
         logger.error("Failed to discard pending %s/%s: %s", subsystem, pending_id, e)
     return False
+
+
+def reject_pending(subsystem: str, pending_id: str, *, reason: str = "rejected by approver") -> bool:
+    """Record rejection in the durable ledger before removing the queue item."""
+    record = get_pending(subsystem, pending_id)
+    if not record:
+        return False
+    history = list(record.get("state_history") or ["pending_approval"])
+    if history[-1] != "rejected":
+        history.append("rejected")
+    record.update({"status": "rejected", "reason": reason, "state_history": history})
+    try:
+        _persist_approval_record(record)
+    except Exception as exc:  # pragma: no cover - defensive disk failure path
+        logger.error("Failed to persist rejected approval %s: %s", pending_id, exc)
+        return False
+    return discard_pending(subsystem, pending_id)
 
 
 def pending_count(subsystem: str) -> int:

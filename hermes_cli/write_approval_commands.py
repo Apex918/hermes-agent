@@ -175,10 +175,10 @@ def _reject(subsystem: str, rest: List[str]) -> str:
     if target.lower() == "all":
         n = 0
         for rec in wa.list_pending(subsystem):
-            if wa.discard_pending(subsystem, rec["id"]):
+            if wa.reject_pending(subsystem, rec["id"]):
                 n += 1
         return f"Rejected {n} pending {subsystem} write(s)."
-    if wa.discard_pending(subsystem, target):
+    if wa.reject_pending(subsystem, target):
         return f"Rejected pending {subsystem} write '{target}'."
     return f"No pending {subsystem} write with id '{target}'."
 

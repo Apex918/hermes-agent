@@ -160,3 +160,94 @@ def test_stage_write_dry_run_does_not_persist_pending_record(hermes_home):
     assert record["audit_ref"]
     pending_dir = Path(hermes_home) / "pending" / "skills"
     assert not pending_dir.exists() or not list(pending_dir.glob("*.json"))
+
+
+def test_state_machine_records_approval_apply_lifecycle():
+    machine = ApprovalStateMachine()
+    plan = machine.plan(
+        subsystem="skills",
+        action="edit",
+        payload={"name": "demo", "content": "new"},
+        summary="edit demo",
+        origin="foreground",
+    )
+
+    approved = machine.approve(plan, receipt="receipt-real-1")
+    assert approved.status == "approved"
+    assert approved.state_history == ("pending_approval", "approved")
+
+    result = machine.apply_once(approved, lambda: {"success": True, "value": 7}, receipt="receipt-real-1")
+
+    assert result["status"] == "applied"
+    assert result["state_history"] == ["pending_approval", "approved", "applying", "applied"]
+
+
+def test_state_machine_records_failed_apply_and_rejects_bypass_markers():
+    machine = ApprovalStateMachine()
+    plan = machine.plan(
+        subsystem="crm",
+        action="upsert",
+        payload={"id": "c1"},
+        summary="upsert contact",
+        origin="foreground",
+        approval_level="R3",
+    )
+
+    rejected = machine.apply_once(plan, lambda: {"success": True}, receipt="--yolo")
+    assert rejected["status"] == "rejected"
+    assert rejected["state_history"] == ["pending_approval", "rejected"]
+
+    approved = machine.approve(plan, receipt="receipt-real-2")
+    failed = machine.apply_once(approved, lambda: {"success": False, "error": "provider down"}, receipt="receipt-real-2")
+    assert failed["status"] == "failed"
+    assert failed["state_history"] == ["pending_approval", "approved", "applying", "failed"]
+
+
+def test_approval_record_is_readable_after_apply(hermes_home):
+    record = wa.stage_write(
+        wa.MEMORY,
+        {"action": "replace", "target": "user", "old_text": "old", "content": "new"},
+        summary="replace memory",
+        origin="foreground",
+        approval_level="R2",
+    )
+    outcome = wa.apply_pending(record, lambda: {"success": True, "changed": True}, receipt="receipt-real-3")
+    assert outcome["status"] == "applied"
+    audit = wa.read_approval(record["id"])
+    assert audit["audit_ref"] == record["audit_ref"]
+    assert audit["status"] == "applied"
+    assert audit["approval_receipt"] == "receipt-real-3"
+
+
+def test_apply_pending_uses_durable_ledger_after_state_machine_restart(hermes_home):
+    record = wa.stage_write(
+        wa.MEMORY,
+        {"action": "add", "target": "user", "content": "once only"},
+        summary="once only",
+        origin="foreground",
+        approval_level="R2",
+    )
+    calls: list[str] = []
+
+    first = wa.apply_pending(record, lambda: calls.append("write") or {"success": True}, receipt="receipt-real-4")
+    wa.DEFAULT_STATE_MACHINE.clear()
+    second = wa.apply_pending(record, lambda: calls.append("duplicate") or {"success": True}, receipt="receipt-real-4")
+
+    assert first["status"] == "applied"
+    assert second["idempotent"] is True
+    assert calls == ["write"]
+
+
+def test_reject_pending_is_auditable(hermes_home):
+    record = wa.stage_write(
+        wa.SKILLS,
+        {"action": "delete", "name": "demo"},
+        summary="delete demo",
+        origin="foreground",
+    )
+
+    assert wa.reject_pending(wa.SKILLS, record["id"], reason="not authorized") is True
+    audit = wa.read_approval(record["id"])
+    assert audit is not None
+    assert audit["status"] == "rejected"
+    assert audit["reason"] == "not authorized"

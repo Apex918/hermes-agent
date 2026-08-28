@@ -62,6 +62,20 @@ class CRMCommitResult:
     error: str = ""
     idempotent: bool = False
     gate_decision: str = ""
+    terminal_status: ApprovalStatus | None = None
+
+    def __post_init__(self) -> None:
+        """Keep the pre-N2 ``approved`` facade while exposing final state.
+
+        Older provider consumers treated a successful commit as ``approved``.
+        The shared state machine now distinguishes approval from application;
+        retain that source-compatible label and expose the authoritative final
+        state as ``terminal_status``.
+        """
+        if self.terminal_status is None:
+            object.__setattr__(self, "terminal_status", self.status)
+        if self.status == "applied":
+            object.__setattr__(self, "status", "approved")
 
 
 class CRMProvider(abc.ABC):

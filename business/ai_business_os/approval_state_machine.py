@@ -7,15 +7,32 @@ service dependencies.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from hashlib import sha256
 import json
 from typing import Any, Callable, Literal
 
 ApprovalLevel = Literal["R1", "R2", "R3"]
-ApprovalStatus = Literal["dry_run", "pending", "approved", "rejected", "rolled_back"]
+ApprovalStatus = Literal[
+    "dry_run",
+    "pending_approval",
+    "approved",
+    "rejected",
+    "applying",
+    "applied",
+    "failed",
+    "rolled_back",
+]
 
 _RANK = {"R1": 1, "R2": 2, "R3": 3}
+_BYPASS_RECEIPTS = {"--yolo", "yolo", "approvals.mode=off", "approval.mode=off", "off"}
+
+
+def _is_real_receipt(receipt: str | None) -> bool:
+    """Accept an explicit receipt, never a runtime/config bypass marker."""
+    if not isinstance(receipt, str) or not receipt.strip():
+        return False
+    return receipt.strip().lower() not in _BYPASS_RECEIPTS
 
 
 @dataclass(frozen=True)
@@ -29,10 +46,11 @@ class ApprovalPlan:
     rollback: dict[str, Any]
     audit_ref: str
     idempotency_key: str
-    status: ApprovalStatus = "pending"
+    status: ApprovalStatus = "pending_approval"
     dry_run: bool = False
     receipt: str = ""
     reason: str = ""
+    state_history: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -48,6 +66,8 @@ class ApprovalOutcome:
     result: Any = None
     error: str = ""
     idempotent: bool = False
+    approval_receipt: str = ""
+    state_history: tuple[str, ...] = ()
 
 
 class ApprovalStateMachine:
@@ -95,7 +115,7 @@ class ApprovalStateMachine:
             origin=origin,
             approval_level=level,
         )
-        status: ApprovalStatus = "dry_run" if dry_run else "pending"
+        status: ApprovalStatus = "dry_run" if dry_run else "pending_approval"
         reason = ""
         if receipt_required and receipt:
             reason = "receipt supplied"
@@ -117,7 +137,47 @@ class ApprovalStateMachine:
             dry_run=dry_run,
             receipt=receipt or "",
             reason=reason,
+            state_history=(status,),
         )
+
+    def transition(
+        self,
+        plan: ApprovalPlan,
+        status: ApprovalStatus,
+        *,
+        reason: str = "",
+        receipt: str | None = None,
+    ) -> ApprovalPlan:
+        """Return ``plan`` in the next legal state, without applying effects."""
+        allowed = {
+            "dry_run": set(),
+            "pending_approval": {"approved", "rejected"},
+            "approved": {"applying"},
+            "applying": {"applied", "failed"},
+            "rejected": set(),
+            "applied": set(),
+            "failed": set(),
+            "rolled_back": set(),
+        }
+        if status not in allowed.get(plan.status, set()):
+            raise ValueError(f"invalid approval transition: {plan.status} -> {status}")
+        if status == "approved" and plan.receipt_required and not _is_real_receipt(receipt):
+            raise ValueError("R2/R3 approval receipt required")
+        history = plan.state_history or (plan.status,)
+        return replace(
+            plan,
+            status=status,
+            receipt=receipt or plan.receipt,
+            reason=reason or plan.reason,
+            state_history=history + (status,),
+        )
+
+    def approve(self, plan: ApprovalPlan, *, receipt: str | None = None) -> ApprovalPlan:
+        """Record a business approval; runtime bypass flags are not receipts."""
+        return self.transition(plan, "approved", receipt=receipt, reason="approval receipt accepted")
+
+    def reject(self, plan: ApprovalPlan, *, reason: str = "rejected by approver") -> ApprovalPlan:
+        return self.transition(plan, "rejected", reason=reason)
 
     def apply_once(
         self,
@@ -126,19 +186,8 @@ class ApprovalStateMachine:
         *,
         receipt: str | None = None,
     ) -> dict[str, Any]:
-        if plan.receipt_required and not receipt:
-            outcome = ApprovalOutcome(
-                success=False,
-                status="rejected",
-                audit_ref=plan.audit_ref,
-                idempotency_key=plan.idempotency_key,
-                approval_level=plan.approval_level,
-                preview=plan.preview,
-                diff=plan.diff,
-                rollback=plan.rollback,
-                error="R2/R3 approval receipt required",
-            )
-            return outcome.__dict__.copy()
+        if plan.dry_run:
+            return self._rejected_result(plan, "dry-run records cannot be applied", history_end="rejected")
 
         cached = self._applied.get(plan.idempotency_key)
         if cached is not None:
@@ -146,36 +195,90 @@ class ApprovalStateMachine:
             if isinstance(cached.result, dict):
                 result.update(cached.result)
             result["idempotent"] = True
+            result["state_history"] = list(cached.state_history)
             return result
 
-        value = effect()
+        if plan.status == "pending_approval":
+            if plan.receipt_required and not _is_real_receipt(receipt):
+                rejected = self.reject(plan, reason="R2/R3 approval receipt required")
+                return self._rejected_result(rejected, "R2/R3 approval receipt required")
+            plan = self.approve(plan, receipt=receipt)
+        elif plan.status != "approved":
+            return self._rejected_result(plan, f"record is not approved: {plan.status}")
+
+        if plan.receipt_required and not _is_real_receipt(receipt or plan.receipt):
+            return self._rejected_result(plan, "R2/R3 approval receipt required", history_end="rejected")
+
+        applying = self.transition(plan, "applying", receipt=receipt)
+        try:
+            value = effect()
+        except Exception as exc:
+            failed = self.transition(applying, "failed", reason=str(exc), receipt=receipt)
+            result = self._outcome(failed, success=False, error=str(exc)).__dict__.copy()
+            result["state_history"] = list(failed.state_history)
+            return result
+
         if isinstance(value, dict) and value.get("success") is False:
-            return {
-                "success": False,
-                "status": value.get("status", "rejected"),
-                "error": value.get("error", "side effect rejected"),
-                "audit_ref": plan.audit_ref,
-                "idempotency_key": plan.idempotency_key,
-                "approval_level": plan.approval_level,
-                "preview": plan.preview,
-                "diff": plan.diff,
-                "rollback": plan.rollback,
-            }
+            failed = self.transition(
+                applying,
+                "failed",
+                reason=value.get("error", "side effect rejected"),
+                receipt=receipt,
+            )
+            result = self._outcome(failed, success=False, error=value.get("error", "side effect rejected")).__dict__.copy()
+            result["state_history"] = list(failed.state_history)
+            return result
+
+        applied = self.transition(applying, "applied", receipt=receipt, reason="side effect applied")
+        outcome = self._outcome(applied, success=True, result=value)
+        self._applied[plan.idempotency_key] = outcome
+        result = outcome.__dict__.copy()
+        if isinstance(value, dict):
+            result.update(value)
+        result["state_history"] = list(outcome.state_history)
+        return result
+
+    @staticmethod
+    def _outcome(
+        plan: ApprovalPlan,
+        *,
+        success: bool,
+        result: Any = None,
+        error: str = "",
+    ) -> ApprovalOutcome:
         outcome = ApprovalOutcome(
-            success=True,
-            status="approved",
+            success=success,
+            status=plan.status,
             audit_ref=plan.audit_ref,
             idempotency_key=plan.idempotency_key,
             approval_level=plan.approval_level,
             preview=plan.preview,
             diff=plan.diff,
             rollback=plan.rollback,
-            result=value,
+            result=result,
+            error=error,
+            approval_receipt=plan.receipt,
+            state_history=plan.state_history,
         )
-        self._applied[plan.idempotency_key] = outcome
-        result = outcome.__dict__.copy()
-        if isinstance(value, dict):
-            result.update(value)
+        return outcome
+
+    @classmethod
+    def _rejected_result(
+        cls,
+        plan: ApprovalPlan,
+        error: str,
+        *,
+        history_end: str | None = None,
+    ) -> dict[str, Any]:
+        history = plan.state_history or (plan.status,)
+        if history_end and (not history or history[-1] != history_end):
+            history = history + (history_end,)
+        result = cls._outcome(
+            replace(plan, status="rejected", state_history=history),
+            success=False,
+            error=error,
+        ).__dict__.copy()
+        result["state_history"] = list(history)
         return result
 
     def clear(self) -> None:
