@@ -85,6 +85,21 @@ def test_ima_archive_is_a_preview_and_webhook_is_optional():
     assert event["production_write"] is False
 
 
+def test_preview_all_classifies_event_fixture_by_kind_and_count():
+    fixture = REPO / "business" / "ai_business_os" / "fixtures" / "feishu-events.v1.json"
+    provider = FakeFeishuProvider.from_fixture(json.loads(fixture.read_text(encoding="utf-8")))
+    result = FeishuExplicitAdapter(provider).preview_all()
+
+    assert {kind: len(items) for kind, items in result.items()} == {
+        "tasks": 1,
+        "calendar": 1,
+        "base": 1,
+    }
+    assert result["tasks"][0]["payload"]["resource"]["task_id"] == "task_fixture_001"
+    assert result["calendar"][0]["payload"]["resource"]["event_id"] == "cal_event_fixture_001"
+    assert result["base"][0]["payload"]["resource"]["record_id"] == "rec_fixture_001"
+
+
 def test_real_lark_cli_commands_emit_contract_json():
     fixture = REPO / "business" / "ai_business_os" / "fixtures" / "feishu-events.v1.json"
     command = [sys.executable, "-m", "business.ai_business_os.lark_cli", "--fixture", str(fixture)]
@@ -98,6 +113,12 @@ def test_real_lark_cli_commands_emit_contract_json():
     assert preview.returncode == 0, preview.stderr
     previews = json.loads(preview.stdout)
     assert set(previews) == {"tasks", "calendar", "base"}
+    assert {kind: len(items) for kind, items in previews.items()} == {
+        "tasks": 1,
+        "calendar": 1,
+        "base": 1,
+    }
+    assert previews["calendar"][0]["payload"]["resource"]["event_id"] == "cal_event_fixture_001"
     assert all(item["production_write"] is False for items in previews.values() for item in items)
 
     ima = subprocess.run(

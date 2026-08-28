@@ -101,9 +101,15 @@ class FakeFeishuProvider:
             if resource and isinstance(payload, Mapping):
                 resources[resource].append(dict(payload))
         # A hand-authored local provider fixture may use direct resource keys.
+        # Do not treat a typed event envelope as a direct Calendar resource:
+        # ``events`` contains every Feishu event kind in the checked-in corpus.
+        typed_events = fixture.get("events")
+        has_typed_events = isinstance(typed_events, list) and any(
+            isinstance(item, Mapping) and "kind" in item and "payload" in item for item in typed_events
+        )
         for kind in resources:
             direct = fixture.get(kind)
-            if direct is None:
+            if direct is None and not (kind == "calendar" and has_typed_events):
                 direct = fixture.get({"tasks": "task", "calendar": "events", "base": "records"}[kind])
             if isinstance(direct, list):
                 resources[kind] = [dict(item) for item in direct if isinstance(item, Mapping)]
