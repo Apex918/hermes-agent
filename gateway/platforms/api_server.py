@@ -17,6 +17,7 @@ Exposes an HTTP server with endpoints:
 - POST /v1/runs                    — start a run, returns run_id immediately (202)
 - GET  /v1/runs/{run_id}           — retrieve current run status
 - GET  /v1/runs/{run_id}/events    — SSE stream of structured lifecycle events
+- GET  /api/readonly/{tenant_id}/runs/{run_id}/evidence — fixture/sandbox-only evidence projection
 - POST /v1/runs/{run_id}/approval — resolve a pending run approval
 - POST /v1/runs/{run_id}/steer      — inject guidance into a running agent
 - POST /v1/runs/{run_id}/stop       — interrupt a running agent
@@ -167,6 +168,12 @@ from gateway.browser_control_broker import (
     browser_control_protocol_supported,
     filter_browser_control_capabilities,
     get_browser_control_broker,
+)
+from gateway.run_evidence_facade import (
+    FACADE_PATH_TEMPLATE as RUN_EVIDENCE_FACADE_PATH,
+    RunEvidenceFacade,
+    RunEvidenceScope,
+    RunEvidenceUnavailable,
 )
 
 from agent.secret_scope import UnscopedSecretError as _UnscopedSecretError
@@ -1560,6 +1567,10 @@ class APIServerAdapter(BasePlatformAdapter):
         self._stopping_run_ids: set[str] = set()
         # Pollable run status for dashboards and external control-plane UIs.
         self._run_statuses: Dict[str, Dict[str, Any]] = {}
+        # Optional explicitly injected local projection for the source-owned
+        # read-only run evidence route.  It is intentionally absent by default:
+        # no API request can turn this offline facade into a live integration.
+        self._run_evidence_facade: Optional[RunEvidenceFacade] = None
         # Active approval session key for each run_id.  The approval core
         # resolves requests by session key, while API clients address the
         # in-flight run by run_id.
@@ -1613,6 +1624,17 @@ class APIServerAdapter(BasePlatformAdapter):
         # _inject_browser_control_artifacts().
         self._browser_control_artifacts: Dict[str, ArtifactStore] = {}
         self._browser_control_artifact_limiter: Optional[ArtifactRateLimiter] = None
+
+    def _inject_run_evidence_facade(self, facade: RunEvidenceFacade) -> None:
+        """Inject an offline fixture facade for tests and sandbox validation.
+
+        The explicit type check prevents a caller from smuggling a live
+        transport, credential resolver, or write-capable object into this
+        source-owned GET-only route.  Production startup never calls this.
+        """
+        if type(facade) is not RunEvidenceFacade:
+            raise TypeError("facade must be RunEvidenceFacade")
+        self._run_evidence_facade = facade
 
     def active_agent_work_count(self) -> int:
         """Return all live agent work owned by this API adapter.
@@ -2266,6 +2288,10 @@ class APIServerAdapter(BasePlatformAdapter):
             ("POST", "/api/jobs/{job_id}/run", self._handle_run_job),
             ("POST", "/v1/runs", self._handle_runs),
             ("GET", "/v1/runs/{run_id}", self._handle_get_run),
+            # Source-owned, fixture/sandbox-only projection.  The route is
+            # deliberately GET-only; the injected facade never owns run
+            # lifecycle or event mutation.
+            ("GET", RUN_EVIDENCE_FACADE_PATH, self._handle_run_evidence),
             ("GET", "/v1/runs/{run_id}/events", self._handle_run_events),
             ("POST", "/v1/runs/{run_id}/approval", self._handle_run_approval),
             ("POST", "/v1/runs/{run_id}/steer", self._handle_steer_run),
@@ -8033,6 +8059,69 @@ class APIServerAdapter(BasePlatformAdapter):
                 status=404,
             )
         return web.json_response(status)
+
+    async def _handle_run_evidence(self, request: "web.Request") -> "web.Response":
+        """GET the explicitly injected local run-evidence projection.
+
+        Authentication remains owned by the API server (API_SERVER_KEY, with
+        mTLS termination outside this adapter).  The projection itself still
+        requires target-derived principal, tenant, project, and exact ACL
+        headers.  No request body/query and no lifecycle mutation are allowed.
+        """
+        auth_err = self._check_auth(request)
+        if auth_err:
+            return auth_err
+        if request.query:
+            return web.json_response(
+                _openai_error("Query parameters are not allowed", code="query_not_allowed"),
+                status=400,
+            )
+        if request.content_length not in (None, 0):
+            return web.json_response(
+                _openai_error("GET request body is not allowed", code="body_not_allowed"),
+                status=400,
+            )
+
+        facade = self._run_evidence_facade
+        if facade is None:
+            return web.json_response(
+                _openai_error(
+                    "Run evidence facade is unavailable in this non-integrated server",
+                    err_type="server_error",
+                    code="run_evidence_facade_unavailable",
+                ),
+                status=503,
+            )
+
+        tenant_id = request.match_info.get("tenant_id", "")
+        run_id = request.match_info.get("run_id", "")
+        principal_ref = request.headers.get("X-Principal-Ref", "")
+        project_id = request.headers.get("X-Project-Id", "")
+        acl_scope = request.headers.get("X-ACL-Scope", "")
+        try:
+            scope = RunEvidenceScope(
+                principal_ref=principal_ref,
+                tenant_id=request.headers.get("X-Tenant-Id", ""),
+                project_id=project_id,
+                acl_scope=acl_scope,
+            )
+            projection = facade.read(
+                tenant_id,
+                run_id,
+                scope,
+                credential_ref=request.headers.get("X-Credential-Ref"),
+            )
+        except ValueError as exc:
+            return web.json_response(
+                _openai_error(str(exc), code="invalid_read_scope"),
+                status=400,
+            )
+        except RunEvidenceUnavailable as exc:
+            return web.json_response(
+                _openai_error(str(exc), code="run_evidence_unavailable"),
+                status=403,
+            )
+        return web.json_response(projection)
 
     async def _handle_run_events(self, request: "web.Request") -> "web.StreamResponse":
         """GET /v1/runs/{run_id}/events — SSE stream of structured agent lifecycle events."""

@@ -1,0 +1,42 @@
+{
+  "$schema": "hermes.run-evidence-facade-evidence.v1",
+  "system": "hermes",
+  "facade_path": "/api/readonly/{tenant_id}/runs/{run_id}/evidence",
+  "facade_method": "GET",
+  "facade_status": "implemented_offline_fixture_only",
+  "api_version": "v1/0.20.6",
+  "api_version_status": "verified",
+  "native_source_evidence": {
+    "existing_run_status_path": "/v1/runs/{run_id}",
+    "existing_run_events_path": "/v1/runs/{run_id}/events",
+    "source_refs": [
+      "gateway/platforms/api_server.py:17-19",
+      "gateway/platforms/api_server.py:2267-2269",
+      "hermes_cli/__init__.py:17"
+    ],
+    "status": "source_verified"
+  },
+  "read_policy": {
+    "resource": "run_evidence",
+    "acl_scope": "read:run",
+    "auth_owner": "target_system",
+    "auth_scheme": "API_SERVER_KEY_or_mTLS_termination",
+    "required_headers": [
+      "X-Principal-Ref",
+      "X-Tenant-Id",
+      "X-Project-Id",
+      "X-ACL-Scope"
+    ],
+    "credential_ref": "opaque_only_never_resolved"
+  },
+  "security_invariants": {
+    "integration_status": "not_integrated",
+    "network_access": false,
+    "external_effects": 0,
+    "event_write": false,
+    "delegate": false,
+    "kanban_mutation": false,
+    "credential_access": false,
+    "environment": "fixture_sandbox_staging_only"
+  }
+}
