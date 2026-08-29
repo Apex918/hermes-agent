@@ -165,6 +165,15 @@ def test_api_route_is_exactly_get_only_and_uses_existing_target_auth():
             body = await client.request("GET", "/api/readonly/tenant-a/runs/run_fixture_1/evidence", data="forbidden", headers=headers)
             assert body.status == 400
 
+            chunked_body = await client.request(
+                "GET",
+                "/api/readonly/tenant-a/runs/run_fixture_1/evidence",
+                data="forbidden",
+                chunked=True,
+                headers=headers,
+            )
+            assert chunked_body.status == 400
+
             mutation = await client.post("/api/readonly/tenant-a/runs/run_fixture_1/evidence", headers=headers)
             assert mutation.status == 405
 

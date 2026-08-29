@@ -8076,6 +8076,12 @@ class APIServerAdapter(BasePlatformAdapter):
                 _openai_error("Query parameters are not allowed", code="query_not_allowed"),
                 status=400,
             )
+        transfer_encoding = request.headers.get("Transfer-Encoding", "")
+        if any(token.strip().lower() == "chunked" for token in transfer_encoding.split(",")):
+            return web.json_response(
+                _openai_error("GET request body is not allowed", code="body_not_allowed"),
+                status=400,
+            )
         if request.content_length not in (None, 0):
             return web.json_response(
                 _openai_error("GET request body is not allowed", code="body_not_allowed"),
