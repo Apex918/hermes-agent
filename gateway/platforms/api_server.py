@@ -174,6 +174,7 @@ from gateway.run_evidence_facade import (
     RunEvidenceFacade,
     RunEvidenceScope,
     RunEvidenceUnavailable,
+    HermesRunEvidenceStore,
 )
 
 from agent.secret_scope import UnscopedSecretError as _UnscopedSecretError
@@ -1571,6 +1572,17 @@ class APIServerAdapter(BasePlatformAdapter):
         # read-only run evidence route.  It is intentionally absent by default:
         # no API request can turn this offline facade into a live integration.
         self._run_evidence_facade: Optional[RunEvidenceFacade] = None
+        configured_store_path = extra.get(
+            "run_evidence_store_path",
+            os.getenv("HERMES_RUN_EVIDENCE_STORE_PATH", ""),
+        )
+        if isinstance(configured_store_path, str) and configured_store_path.strip():
+            try:
+                evidence_store = HermesRunEvidenceStore.from_jsonl(Path(configured_store_path))
+                self._run_evidence_facade = RunEvidenceFacade(evidence_store)
+            except (OSError, TypeError, ValueError, RunEvidenceUnavailable):
+                # Keep the endpoint fail-closed without logging path contents or records.
+                logger.warning("[api_server] configured run evidence store unavailable")
         # Active approval session key for each run_id.  The approval core
         # resolves requests by session key, while API clients address the
         # in-flight run by run_id.

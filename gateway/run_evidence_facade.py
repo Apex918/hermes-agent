@@ -11,9 +11,11 @@ implementation.
 from __future__ import annotations
 
 import copy
+import json
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Mapping, Optional
 from urllib.parse import quote
 
@@ -80,11 +82,58 @@ class HermesRunEvidenceStore:
     filesystem/database adapter.
     """
 
-    def __init__(self, records: Mapping[tuple[str, str], Mapping[str, Any]]) -> None:
+    def __init__(
+        self,
+        records: Mapping[tuple[str, str], Mapping[str, Any]],
+        *,
+        storage_mode: str = "fixture",
+    ) -> None:
         if not isinstance(records, Mapping):
             raise TypeError("records must be a mapping")
+        if storage_mode not in {"fixture", "source_owned_readonly"}:
+            raise ValueError("unsupported storage mode")
         self._records = copy.deepcopy(dict(records))
+        self.storage_mode = storage_mode
         self.reads: list[tuple[str, str]] = []
+
+    @classmethod
+    def from_jsonl(cls, path: Path) -> "HermesRunEvidenceStore":
+        """Load immutable source-owned projections from a local JSONL file."""
+        if not isinstance(path, Path):
+            path = Path(path)
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeError) as exc:
+            raise RunEvidenceUnavailable("source-owned evidence store is unavailable") from exc
+
+        records: dict[tuple[str, str], Mapping[str, Any]] = {}
+        for line_number, line in enumerate(lines, start=1):
+            if not line.strip():
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise RunEvidenceUnavailable(
+                    "source-owned evidence store contains malformed JSON"
+                ) from exc
+            if not isinstance(record, Mapping):
+                raise RunEvidenceUnavailable("source-owned evidence record is malformed")
+            tenant_id = record.get("tenant_id")
+            run_id = record.get("run_id")
+            if not isinstance(tenant_id, str) or not tenant_id.strip():
+                raise RunEvidenceUnavailable("source-owned evidence tenant_id is invalid")
+            if not isinstance(run_id, str) or not run_id.strip():
+                raise RunEvidenceUnavailable("source-owned evidence run_id is invalid")
+            key = (tenant_id, run_id)
+            if key in records:
+                raise RunEvidenceUnavailable(
+                    "source-owned evidence store contains duplicate records"
+                )
+            records[key] = record
+
+        if not records:
+            raise RunEvidenceUnavailable("source-owned evidence store is empty")
+        return cls(records, storage_mode="source_owned_readonly")
 
     def read(self, tenant_id: str, run_id: str) -> Mapping[str, Any]:
         key = (tenant_id, run_id)
