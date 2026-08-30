@@ -1,11 +1,10 @@
-"""Hermes-owned, fixture-backed run evidence read facade.
+"""Hermes-owned, source-owned readonly run evidence facade.
 
 The facade is deliberately a local projection boundary.  It does not open a
 socket, read SessionDB, resolve credentials, call a delegate, or mutate
-Hermes/Kanban state.  A future integration may provide an equivalent
-source-owned store only after a separate authorization review; this module
-keeps ``integration_status=not_integrated`` permanently for the offline
-implementation.
+Hermes/Kanban state.  It supports deterministic fixture input for contract
+tests and an explicitly configured local JSONL source-owned store for isolated
+runtime validation; neither mode is a live integration.
 """
 
 from __future__ import annotations
@@ -75,11 +74,10 @@ class RunEvidenceScope:
 
 
 class HermesRunEvidenceStore:
-    """An immutable-in-use mapping of explicit local fixture projections.
+    """An immutable-in-use mapping of explicit local projections.
 
-    The constructor takes a copy of its input.  The only public operation is
-    ``read``; callers cannot use this store as an event writer or as a generic
-    filesystem/database adapter.
+    The constructor accepts an in-memory fixture for offline contract tests;
+    ``from_jsonl`` marks a validated local source-owned readonly store.
     """
 
     def __init__(
@@ -107,7 +105,7 @@ class HermesRunEvidenceStore:
             raise RunEvidenceUnavailable("source-owned evidence store is unavailable") from exc
 
         records: dict[tuple[str, str], Mapping[str, Any]] = {}
-        for line_number, line in enumerate(lines, start=1):
+        for _line_number, line in enumerate(lines, start=1):
             if not line.strip():
                 continue
             try:
