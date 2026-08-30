@@ -134,6 +134,34 @@ def test_schema_rejects_mutation_and_network_metadata():
             validator.validate(invalid)
 
 
+def test_source_owned_jsonl_store_reloads_without_fixture_mapping(tmp_path: Path):
+    record = _record()
+    path = tmp_path / "run-evidence.jsonl"
+    path.write_text(json.dumps(record) + "\n", encoding="utf-8")
+
+    store = HermesRunEvidenceStore.from_jsonl(path)
+
+    assert store.storage_mode == "source_owned_readonly"
+    assert store.read("tenant-a", "run_fixture_1") == record
+
+
+def test_api_adapter_binds_configured_source_owned_store(tmp_path: Path):
+    record = _record()
+    path = tmp_path / "run-evidence.jsonl"
+    path.write_text(json.dumps(record) + "\n", encoding="utf-8")
+    adapter = APIServerAdapter(
+        PlatformConfig(
+            enabled=True,
+            extra={"key": "«redacted:sk-…»", "run_evidence_store_path": str(path)},
+        )
+    )
+
+    assert adapter._run_evidence_facade is not None
+
+    scope = RunEvidenceScope("principal-a", "tenant-a", "project-a", ACL_SCOPE)
+    assert adapter._run_evidence_facade.read("tenant-a", "run_fixture_1", scope)["run_id"] == "run_fixture_1"
+
+
 def test_api_route_is_exactly_get_only_and_uses_existing_target_auth():
     adapter = APIServerAdapter(PlatformConfig(enabled=True, extra={"key": "sk-hermes-test"}))
     facade, _, _ = _facade()
