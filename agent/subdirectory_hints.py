@@ -21,7 +21,8 @@ from pathlib import Path
 from typing import Dict, Any, Optional, Set
 
 from hermes_constants import get_real_home
-from agent.prompt_builder import _scan_context_content
+from agent.prompt_builder import _read_text_with_timeout, _scan_context_content
+from agent.search_policy import SEARCH_PRUNE_DIR_NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -48,17 +49,9 @@ _COMMAND_TOOLS = {"terminal"}
 # Prevents scanning all the way to / for deeply nested paths.
 _MAX_ANCESTOR_WALK = 5
 
-# Directory names that never contain authoritative project context.
-# Backups, vendored deps, VCS internals, and caches routinely hold *copies* of
-# AGENTS.md; loading those duplicates real context and inflates the prompt.
-_EXCLUDED_DIR_NAMES = frozenset({
-    "node_modules", "venv", ".venv", "__pycache__",
-    ".git", ".hg", ".svn",
-    ".Trash", ".cache", ".tox", ".mypy_cache", ".pytest_cache",
-    "site-packages", "dist-packages",
-    "backups", "backup", ".backups",
-    "vendor", "third_party",
-})
+# Shared with broad recursive search probes so context discovery and search do
+# not drift into different dependency/cache/build trees.
+_EXCLUDED_DIR_NAMES = SEARCH_PRUNE_DIR_NAMES
 
 
 def _is_ancestor_or_same(a: Path, b: Path) -> bool:
@@ -125,7 +118,7 @@ class SubdirectoryHintTracker:
             try:
                 if not candidate.is_file():
                     continue
-                content = candidate.read_text(encoding="utf-8").strip()
+                content = (_read_text_with_timeout(candidate) or "").strip()
             except (OSError, UnicodeDecodeError):
                 continue
             if content:
@@ -302,7 +295,7 @@ class SubdirectoryHintTracker:
             except OSError:
                 continue
             try:
-                content = hint_path.read_text(encoding="utf-8").strip()
+                content = (_read_text_with_timeout(hint_path) or "").strip()
                 if not content:
                     continue
                 # Skip content we've already injected. The same AGENTS.md is
