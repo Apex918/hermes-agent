@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, Set
 
 from hermes_constants import get_real_home
-from agent.prompt_builder import _read_text_with_timeout, _scan_context_content
+from agent.prompt_builder import _read_text_with_timeout, _scan_context_content, _truncate_content
 from agent.search_policy import SEARCH_PRUNE_DIR_NAMES
 
 logger = logging.getLogger(__name__)
@@ -36,8 +36,10 @@ _HINT_FILENAMES = [
     ".cursorrules",
 ]
 
-# Maximum chars per hint file to prevent context bloat
-_MAX_HINT_CHARS = 8_000
+# Maximum chars per hint file to prevent context bloat. Keep area-level
+# instructions intact while allowing the shared helper to retain both head
+# and tail when a file exceeds the ceiling.
+_MAX_HINT_CHARS = 32_000
 
 # Tool argument keys that typically contain file paths
 _PATH_ARG_KEYS = {"path", "file_path", "workdir"}
@@ -313,11 +315,6 @@ class SubdirectoryHintTracker:
                 self._loaded_digests.add(digest)
                 # Same security scan as startup context loading
                 content = _scan_context_content(content, filename)
-                if len(content) > _MAX_HINT_CHARS:
-                    content = (
-                        content[:_MAX_HINT_CHARS]
-                        + f"\n\n[...truncated {filename}: {len(content):,} chars total]"
-                    )
                 # Best-effort relative path for display
                 rel_path = str(hint_path)
                 try:
@@ -329,6 +326,12 @@ class SubdirectoryHintTracker:
                         rel_path = "~/" + hint_path.relative_to(Path.home()).as_posix()
                     except (ValueError, RuntimeError):
                         pass  # keep absolute
+                content = _truncate_content(
+                    content,
+                    filename,
+                    max_chars=_MAX_HINT_CHARS,
+                    read_path=rel_path,
+                )
                 found_hints.append((rel_path, content))
                 # First match wins per directory (like startup loading)
                 break
