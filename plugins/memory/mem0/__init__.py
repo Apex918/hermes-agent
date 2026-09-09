@@ -61,6 +61,32 @@ _CLIENT_ERROR_TYPES = ("MemoryNotFoundError", "ValidationError")
 # through instead of silently overriding them with the placeholder.
 _DEFAULT_USER_ID = "hermes-user"
 
+# sync_turn sends the whole turn to the backend for fact extraction. OSS embedding
+# models often have small context windows (bge-small-zh-v1.5: 512 tokens ≈ 500 chars;
+# jina-embeddings-v3: 8192), and oversized turns make backend.add() raise — Ollama
+# answers HTTP 500, hosted APIs return INPUT_TOKEN_LIMIT_EXCEEDED — which _try only
+# logs, silently dropping the turn's memory extraction. Cap each message up front.
+# The default fits a 512-token embedder (measured: 450 OK, 600 -> HTTP 500 on
+# bge-small-zh-v1.5:f16); ``sync_max_chars`` in mem0.json raises it for larger windows.
+_SYNC_MSG_MAX_CHARS = 450
+
+
+def _truncate_for_sync(text: str, max_len: int = _SYNC_MSG_MAX_CHARS) -> str:
+    """Cap a synced message at its last sentence boundary within ``max_len``.
+
+    Short messages pass through unchanged; long ones keep the last complete
+    sentence inside the window so fact extraction still sees coherent statements,
+    with a hard cut as fallback when no boundary exists (or one only appears in
+    the first third of the window, which usually means unsegmented input).
+    """
+    if len(text) <= max_len:
+        return text
+    for sep in ("。", "！", "？", ".\n", ".", "!", "?"):
+        cut = text[:max_len].rfind(sep)
+        if cut > max_len // 3:
+            return text[:cut + 1]
+    return text[:max_len]
+
 
 def _is_client_error(exc: Exception) -> bool:
     """True for user-caused errors (bad ID, not found) that should NOT trip circuit breaker."""
@@ -228,6 +254,7 @@ class Mem0MemoryProvider(MemoryProvider):
         self._agent_context = "primary"
         self._agent_identity = ""
         self._agent_workspace = ""
+        self._sync_max_chars = _SYNC_MSG_MAX_CHARS
         self._sync_thread = None
         self._prefetch_thread = None
         self._prefetch_query = ""
@@ -356,10 +383,10 @@ class Mem0MemoryProvider(MemoryProvider):
             )
 
     def initialize(self, session_id: str, **kwargs) -> None:
-        self._config = _load_config()
-        self._mode = self._config.get("mode", "platform")
-        self._api_key = self._config.get("api_key", "")
-        self._host = self._config.get("host", "")
+        cfg = self._config = _load_config()
+        self._mode = cfg.get("mode", "platform")
+        self._api_key = cfg.get("api_key", "")
+        self._host = cfg.get("host", "")
         self._session_id = session_id
         self._parent_session_id = str(kwargs.get("parent_session_id") or "")
         self._agent_context = str(kwargs.get("agent_context") or "primary")
@@ -380,16 +407,17 @@ class Mem0MemoryProvider(MemoryProvider):
         if configured == _DEFAULT_USER_ID:
             configured = None
         self._user_id = configured or kwargs.get("user_id") or _DEFAULT_USER_ID
-        self._agent_id = self._config.get("agent_id", "hermes")
+        self._agent_id = cfg.get("agent_id", "hermes")
         # Persisted rerank preference (setup wizard / mem0.json). Used as the
         # DEFAULT for mem0_search when the model doesn't pass ``rerank``
         # explicitly; per-call args still win. Platform-only feature — other
         # backends accept-and-ignore the flag.
-        _rr = self._config.get("rerank", False)
+        _rr = cfg.get("rerank", False)
         self._rerank_default = (
             _rr.lower() in ("true", "1", "yes") if isinstance(_rr, str) else bool(_rr)
         )
         self._channel = kwargs.get("platform") or "cli"
+        self._sync_max_chars = int(cfg.get("sync_max_chars") or _SYNC_MSG_MAX_CHARS)
         self._backend = self._create_backend()
         if self._backend and not self._atexit_registered:
             atexit.register(self._shutdown_backend)
@@ -583,8 +611,8 @@ class Mem0MemoryProvider(MemoryProvider):
                 return
             try:
                 messages = [
-                    {"role": "user", "content": user_content},
-                    {"role": "assistant", "content": assistant_content},
+                    {"role": "user", "content": _truncate_for_sync(user_content, self._sync_max_chars)},
+                    {"role": "assistant", "content": _truncate_for_sync(assistant_content, self._sync_max_chars)},
                 ]
                 backend.add(
                     messages,
