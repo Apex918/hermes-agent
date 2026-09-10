@@ -217,6 +217,7 @@ class MemoryProvider(ABC):
         *,
         session_id: str = "",
         messages: Optional[List[Dict[str, Any]]] = None,
+        turn_author: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Persist a completed turn to the backend.
 
@@ -226,6 +227,9 @@ class MemoryProvider(ABC):
         ``messages`` is the OpenAI-style conversation message list as of the
         completed turn, including any assistant tool calls and tool results.
         Providers that do not need raw turn context can ignore it.
+        ``turn_author`` (``{"id", "name", "is_bot"}``) identifies who wrote
+        the user side; providers that need it can use it for per-turn identity
+        scoping. The manager sends it only to signatures that accept it.
         """
 
     @abstractmethod
@@ -281,6 +285,18 @@ class MemoryProvider(ABC):
         kwargs may include: remaining_tokens, model, platform, tool_count.
         Providers use what they need; extras are ignored.
         """
+        # Gateway callers may additionally supply author_id, author_name, and
+        # author_is_bot in kwargs for providers that need per-turn identity.
+
+    def identity_signature(self) -> Dict[str, Any]:
+        """Return identity values that should bust a cached gateway agent.
+
+        Providers may return namespaced, JSON-serializable values covering
+        writer identity, alias tables, or session-name prefixing. This method
+        is called on an uninitialized instance for each inbound message, so it
+        must remain cheap and read-only.
+        """
+        return {}
 
     def on_session_end(self, messages: List[Dict[str, Any]]) -> None:
         """Called when a session ends (explicit exit or timeout).
