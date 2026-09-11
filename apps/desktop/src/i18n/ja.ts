@@ -499,6 +499,11 @@ export const ja = defineLocale({
       tabStripAuto: '自動',
       tabStripAlways: '常に表示',
       tabStripNever: '表示しない',
+      appActionsTitle: 'アプリ操作',
+      appActionsDesc:
+        '設定・レイアウト・HUD をタイトルバーの左右どちらに置くか。右にするとタブ用のスペースが左に残ります。',
+      appActionsLeft: '左',
+      appActionsRight: '右',
       terminalFontTitle: 'ターミナルフォント',
       terminalFontDesc:
         'Desktop のターミナルで使用するインストール済みフォントを選びます。Nerd Font は Powerlevel10k とシェルアイコンを表示できます。空欄では内蔵の JetBrains Mono を使用します。',
@@ -1407,18 +1412,18 @@ export const ja = defineLocale({
   skills: {
     collective: {
       notificationPreferences: {
-        title: "通知設定",
-        scope: "この組織の各クライアントで受け取る通知を管理します。手動での閲覧や共有は引き続き利用できます。",
-        on: "通知オン",
-        muted: "通知ミュート",
-        day: "1 日",
-        week: "1 週間",
-        month: "30 日",
-        forever: "無期限",
-        pending: "選択はローカルに保存され、同期待ちです。",
-        failed: "同期に失敗しました。設定を更新してから選び直してください。",
-        conflict: "別のクライアントで設定が変更されました。更新して確認してください。",
-        expired: "この選択は期限切れです。設定を更新して再試行してください。",
+        title: '通知設定',
+        scope: 'この組織の各クライアントで受け取る通知を管理します。手動での閲覧や共有は引き続き利用できます。',
+        on: '通知オン',
+        muted: '通知ミュート',
+        day: '1 日',
+        week: '1 週間',
+        month: '30 日',
+        forever: '無期限',
+        pending: '選択はローカルに保存され、同期待ちです。',
+        failed: '同期に失敗しました。設定を更新してから選び直してください。',
+        conflict: '別のクライアントで設定が変更されました。更新して確認してください。',
+        expired: 'この選択は期限切れです。設定を更新して再試行してください。'
       },
       title: 'コレクティブ・ウィズダム',
       loading: 'コレクティブ・ウィズダムを読み込み中…',
@@ -1491,11 +1496,11 @@ export const ja = defineLocale({
       submit: '下書きを提出',
       submitting: '提出中…',
       readEvery: 'すべてのファイルを確認してください。承認は下記の正確な3つのハッシュに紐づきます。',
-      publishToTeam: "チームに公開",
-      submitForApproval: "承認を申請",
-      publishLocalNotice: "確認すると、このパッケージをアップロードし、必要なチェックの後にチームへ公開します。",
-      submitLocalNotice: "確認すると、このパッケージを組織の承認に提出します。審査完了までは公開されません。",
-      reloadReview: "レビューを再読み込み",
+      publishToTeam: 'チームに公開',
+      submitForApproval: '承認を申請',
+      publishLocalNotice: '確認すると、このパッケージをアップロードし、必要なチェックの後にチームへ公開します。',
+      submitLocalNotice: '確認すると、このパッケージを組織の承認に提出します。審査完了までは公開されません。',
+      reloadReview: 'レビューを再読み込み',
       editReview:
         'ここで説明、SKILL.md、宣言的マニフェストを編集できます。保存すると新しい非公開リビジョンが作成され、スキャンが再実行されて新しいハッシュが返されます。ローカルの元スキルは書き換えません。',
       editOwnerDescription: '所有者による説明を編集',
@@ -1520,7 +1525,8 @@ export const ja = defineLocale({
       share: '共有',
       reviewPreviousPage: '前の確認ページ',
       reviewNextPage: '次の確認ページ',
-      sharePreparationNotice: '共有用のパッケージをローカルで準備します。アップロードや公開の前に、内容を確認して別途承認します。',
+      sharePreparationNotice:
+        '共有用のパッケージをローカルで準備します。アップロードや公開の前に、内容を確認して別途承認します。',
       muteNotificationsSoon: '通知をミュート（近日対応）',
       unmuteNotificationsSoon: '通知のミュートを解除（近日対応）',
       openCollective: 'コレクティブを開く',
@@ -2897,6 +2903,10 @@ export const ja = defineLocale({
     }
   },
 
+  guidedGreeting: {
+    line: 'やあ、どうぞ。Hermes です。二分だけください、あなたに合わせて整えます。それから、本当にやりたいことに取りかかりましょう。\n\nまずは、何とお呼びすればいいですか。',
+    nameSuggestion: (name: string) => `（よければ、${name} さんとお呼びします。）`
+  },
   install: {
     stageStates: {
       pending: '待機中',
@@ -3700,6 +3710,9 @@ export const ja = defineLocale({
     resumeStrandedTitle: 'このセッションを読み込めませんでした',
     resumeStrandedBody:
       'このセッションへの接続に失敗し、自動再試行も停止しました。ゲートウェイが実行中か確認してから、もう一度お試しください。',
+    poolSlotTimeoutBody:
+      'すべてのローカルプロファイルバックエンドスロットが使用中です。「設定」→「詳細設定」で「Warm Bot Backends」を増やすか、アイドル状態のバックエンドが解放された後に再試行してください。',
+    poolSlotTimeoutOpenSettings: '詳細設定を開く',
     resumeRetry: '再試行',
     nothingToBranch: 'ブランチするものがありません',
     branchNeedsChat: 'ブランチする前にチャットを開始または再開してください。',

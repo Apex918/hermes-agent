@@ -484,6 +484,10 @@ export const zhHant = defineLocale({
       tabStripAuto: '自動',
       tabStripAlways: '一律',
       tabStripNever: '永不',
+      appActionsTitle: '應用操作',
+      appActionsDesc: '設定、版面與 HUD 放在標題列左側或右側。選右側可把左側留給分頁。',
+      appActionsLeft: '左側',
+      appActionsRight: '右側',
       terminalFontTitle: '終端機字型',
       terminalFontDesc:
         '選擇已安裝的字型用於桌面端終端機。Nerd Font 可正確顯示 Powerlevel10k 與 Shell 圖示；留空則使用內建的 JetBrains Mono。',
@@ -1356,18 +1360,18 @@ export const zhHant = defineLocale({
       submitLocalNotice: '確認後將上傳此確切的套件供組織審核。審核完成前不會發布。',
       reloadReview: '重新載入審核內容',
       notificationPreferences: {
-        title: "通知設定",
-        scope: "管理此組織中跨用戶端的主動通知。手動瀏覽和分享仍可使用。",
-        on: "通知已開啟",
-        muted: "通知已靜音",
-        day: "1 天",
-        week: "1 週",
-        month: "30 天",
-        forever: "無限期",
-        pending: "選擇已儲存在本機，正在等待同步。",
-        failed: "同步失敗。請重新整理設定後重新選擇。",
-        conflict: "其他用戶端變更了偏好。請重新整理查看。",
-        expired: "此選擇已過期。請重新整理設定後再試。",
+        title: '通知設定',
+        scope: '管理此組織中跨用戶端的主動通知。手動瀏覽和分享仍可使用。',
+        on: '通知已開啟',
+        muted: '通知已靜音',
+        day: '1 天',
+        week: '1 週',
+        month: '30 天',
+        forever: '無限期',
+        pending: '選擇已儲存在本機，正在等待同步。',
+        failed: '同步失敗。請重新整理設定後重新選擇。',
+        conflict: '其他用戶端變更了偏好。請重新整理查看。',
+        expired: '此選擇已過期。請重新整理設定後再試。'
       },
       title: '集體智慧',
       loading: '正在載入集體智慧…',
@@ -2797,6 +2801,10 @@ export const zhHant = defineLocale({
     }
   },
 
+  guidedGreeting: {
+    line: '來了，進來吧。我是 Hermes。給我兩分鐘，把這裡按你的習慣整理一下，然後我們找件你真正想做的事來做。\n\n先說，我該怎麼稱呼你？',
+    nameSuggestion: (name: string) => `（如果你願意，我也可以直接叫你 ${name}。）`
+  },
   install: {
     stageStates: {
       pending: '等待中',
@@ -3547,6 +3555,9 @@ export const zhHant = defineLocale({
     readOnlyTranscriptSendBlocked: '此對話目前以唯讀逐字稿方式開啟——傳送已停用。',
     resumeStrandedTitle: '無法載入此工作階段',
     resumeStrandedBody: '與此工作階段的連線失敗，自動重試已停止。請確認閘道正在執行，然後重試。',
+    poolSlotTimeoutBody:
+      '所有本機設定檔後端插槽目前都在使用中。請在「設定」→「進階」中增加 Warm Bot Backends，或等待閒置後端被移除後重試。',
+    poolSlotTimeoutOpenSettings: '開啟進階設定',
     resumeRetry: '重試',
     nothingToBranch: '沒有可分支的內容',
     branchNeedsChat: '分支前請先開始或繼續一個聊天。',
