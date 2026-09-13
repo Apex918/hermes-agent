@@ -41,9 +41,10 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any, Dict, List
 
-from agent.memory_provider import MemoryProvider
+from agent.memory_provider import MemoryProvider, spawn_context_thread
 from agent.secret_scope import UnscopedSecretError, get_secret
 from tools.registry import tool_error
+from utils import atomic_json_write, read_json_or_empty
 
 logger = logging.getLogger(__name__)
 
@@ -136,16 +137,19 @@ def _load_config() -> dict:
     from hermes_constants import get_hermes_home
     # Identity (user/agent id), host and mode are .env values like the key: read them through the
     # profile scope too, or a secondary profile's memories land in the default profile's account.
-    config = {"mode": _scoped_env("MEM0_MODE") or "platform", "host": _scoped_env("MEM0_HOST"),
-              "agent_id": _scoped_env("MEM0_AGENT_ID") or "hermes", "oss": {}}
-    if user_id := _scoped_env("MEM0_USER_ID"):  # only when explicitly configured, so initialize() can fall back to the gateway-native id
+    # A scope-less multiplex caller raises here on purpose — that is a spawn-site bug, and
+    # swallowing it would silently route the turn's memories to the default profile.
+    config = {"mode": get_secret("MEM0_MODE", "") or "platform", "host": get_secret("MEM0_HOST", "") or "",
+              "agent_id": get_secret("MEM0_AGENT_ID", "") or "hermes", "oss": {}}
+    if user_id := get_secret("MEM0_USER_ID", ""):  # only when explicitly configured, so initialize() can fall back to the gateway-native id
         config["user_id"] = user_id
-    file_cfg = _read_mem0_json(get_hermes_home() / "mem0.json")
+    file_cfg = read_json_or_empty(get_hermes_home() / "mem0.json")
     config.update({k: v for k, v in file_cfg.items() if v is not None and v != ""})
     # MEM0_API_KEY authenticates the Platform and self-hosted HTTP backends; pure OSS mode builds its
-    # backend from the local ``oss`` config and has no platform credential to resolve. Decide after
-    # mem0.json overrode the env fallback so a scope-less multiplex caller can load an OSS config
-    # without weakening fail-closed reads for credentialed modes.
+    # backend from the local ``oss`` config and has no platform credential to resolve, so a profile
+    # scope WITHOUT the key must still load an OSS config (#99121 as it stands today: the caller is
+    # scoped, the scope is just empty). Decided after mem0.json overrode the env defaults because
+    # the file may be what selects ``oss``. Scope-less callers already raised above.
     if config.get("mode", "platform") == "oss":
         config.setdefault("api_key", "")
     elif not config.get("api_key"):
@@ -299,19 +303,9 @@ class Mem0MemoryProvider(MemoryProvider):
         return bool(cfg.get("api_key") or cfg.get("host"))
 
     def save_config(self, values, hermes_home):
-        """Write config to $HERMES_HOME/mem0.json."""
-        import json
-        from pathlib import Path
+        """Merge-write config to $HERMES_HOME/mem0.json."""
         config_path = Path(hermes_home) / "mem0.json"
-        existing = {}
-        if config_path.exists():
-            try:
-                existing = json.loads(config_path.read_text(encoding="utf-8"))
-            except Exception:
-                pass
-        existing.update(values)
-        from utils import atomic_json_write
-        atomic_json_write(config_path, existing, mode=0o600)
+        atomic_json_write(config_path, {**read_json_or_empty(config_path), **values}, mode=0o600)
 
     def get_config_schema(self):
         cfg = _load_config()
@@ -596,9 +590,12 @@ class Mem0MemoryProvider(MemoryProvider):
                     self._prefetch_result = body
                     self._prefetch_done = True
 
-        t = threading.Thread(target=_run, daemon=True, name="mem0-prefetch")
         with self._prefetch_lock:
-            self._prefetch_thread = t
+            # Same query already answered or still in flight: don't restart it.
+            if self._prefetch_query == query and (self._prefetch_done or (self._prefetch_thread and self._prefetch_thread.is_alive())):
+                return
+            self._prefetch_query, self._prefetch_result, self._prefetch_done = query, "", False
+            self._prefetch_thread = t = spawn_context_thread(_run, name="mem0-prefetch")
         t.start()
 
     def prefetch(self, query: str, *, session_id: str = "") -> str:
@@ -649,7 +646,7 @@ class Mem0MemoryProvider(MemoryProvider):
             # If still alive after timeout, skip to avoid duplicate ingestion.
             if self._sync_thread and self._sync_thread.is_alive():
                 return
-            self._sync_thread = threading.Thread(target=_sync, daemon=True, name="mem0-sync")
+            self._sync_thread = spawn_context_thread(_sync, name="mem0-sync")
             self._sync_thread.start()
 
     def get_tool_schemas(self) -> List[Dict[str, Any]]:

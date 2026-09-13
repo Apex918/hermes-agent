@@ -45,6 +45,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import time
 import uuid
 from pathlib import Path
@@ -56,6 +57,7 @@ from business.ai_business_os.approval_state_machine import (
     ApprovalLevel,
     ApprovalPlan,
 )
+from utils import atomic_json_write
 
 logger = logging.getLogger(__name__)
 
@@ -222,10 +224,7 @@ def stage_write(
         if not dry_run:
             d = _pending_dir(subsystem)
             d.mkdir(parents=True, exist_ok=True)
-            path = d / f"{pid}.json"
-            tmp = path.with_suffix(".json.tmp")
-            tmp.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
-            os.replace(tmp, path)
+            atomic_json_write(d / f"{pid}.json", record)
     except Exception as e:  # pragma: no cover - disk failure path
         logger.error("Failed to stage pending %s write: %s", subsystem, e, exc_info=True)
     return record
