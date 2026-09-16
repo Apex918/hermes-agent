@@ -367,6 +367,7 @@ class SubdirectoryHintTracker:
                     filename,
                     max_chars=_MAX_HINT_CHARS,
                     read_path=rel_path,
+                    queue_warning=False,
                 )
                 found_hints.append((rel_path, content))
                 # First match wins per directory (like startup loading)
