@@ -118,6 +118,11 @@ def _pending_dir(subsystem: str) -> Path:
     return get_hermes_home() / "pending" / subsystem
 
 
+def _pending_path(subsystem: str, pending_id: str) -> Path:
+    """Return a pending-record path; kept as a compatibility helper."""
+    return _pending_dir(subsystem) / f"{pending_id}.json"
+
+
 def _approval_dir() -> Path:
     """Durable approval ledger; unlike pending files it survives apply/reject."""
     return get_hermes_home() / "approval"
@@ -342,6 +347,8 @@ def list_pending(subsystem: str) -> List[Dict[str, Any]]:
     for p in d.glob("*.json"):
         try:
             record = json.loads(p.read_text(encoding="utf-8"))
+            if not isinstance(record, dict):
+                raise ValueError(f"expected a JSON object, got {type(record).__name__}")
             if record.get("status", "pending_approval") == "pending_approval":
                 records.append(record)
         except Exception:
@@ -356,7 +363,8 @@ def get_pending(subsystem: str, pending_id: str) -> Optional[Dict[str, Any]]:
     if not path.exists():
         return None
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else None
     except Exception:
         return None
 
