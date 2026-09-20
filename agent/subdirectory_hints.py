@@ -84,6 +84,54 @@ def _resolve_candidate_path(raw_path: str, working_dir: Path) -> Path:
     return p
 
 
+def _resolved_hint_target(hint_path: Path, working_dir: Path) -> Optional[Path]:
+    """Resolved hint-file target, or None when the file must not be loaded.
+
+    ``is_file()`` and ``read_text`` follow symlinks, so a checked-in
+    ``sub/AGENTS.md -> ~/.aws/credentials`` would inject an out-of-tree file
+    into the tool result. The resolved target must stay inside the resolved
+    working dir (same containment ``_within_working_dir`` applies to the
+    directory itself) and pass the canonical read deny-list
+    (``context_references`` applies it to explicit @-references), which also
+    catches in-tree targets like a symlink to the project ``.env``.
+    """
+    try:
+        resolved = hint_path.resolve()
+    except (OSError, RuntimeError):
+        return None
+    try:
+        inside = resolved.is_relative_to(working_dir)
+    except (OSError, ValueError, RuntimeError):
+        inside = False
+    if not inside:
+        return None
+    try:
+        from agent.file_safety import get_read_block_error
+        blocked = get_read_block_error(str(resolved)) is not None
+    except Exception:
+        # Mirror context_references: a deny-list lookup that fails re-opens the
+        # exact hole the check closes, so fail closed.
+        return None
+    return None if blocked else resolved
+
+
+def _first_hint_file(directory: Path):
+    """``(path, stripped content)`` of the first readable non-empty hint file
+    in *directory* (priority order), or None. Unreadable files are skipped."""
+    for filename in _HINT_FILENAMES:
+        candidate = directory / filename
+        try:
+            if not candidate.is_file() or (target := _resolved_hint_target(candidate, directory)) is None:
+                continue
+            # Read the resolved target (not the link path) so a symlink swapped
+            # between check and read still lands on the vetted file.
+            content = target.read_text(encoding="utf-8").strip()
+        except (OSError, UnicodeDecodeError):
+            continue
+        return candidate, content
+    return None
+
+
 _NAV_COMMANDS = frozenset({"cd", "pushd"})
 _SHELL_OPERATORS = frozenset({"&&", "||", "|", ";", "&", ";;", "|&", "(", ")"})
 
@@ -147,9 +195,10 @@ class SubdirectoryHintTracker:
         for filename in _HINT_FILENAMES:
             candidate = self.working_dir / filename
             try:
-                if not candidate.is_file():
+                target = _resolved_hint_target(candidate, self.working_dir)
+                if target is None:
                     continue
-                content = (_read_text_with_timeout(candidate) or "").strip()
+                content = (_read_text_with_timeout(target) or "").strip()
             except (OSError, UnicodeDecodeError):
                 continue
             if content:
@@ -332,8 +381,10 @@ class SubdirectoryHintTracker:
                     continue
             except OSError:
                 continue
+            if (target := _resolved_hint_target(hint_path, self.working_dir)) is None:
+                continue
             try:
-                content = (_read_text_with_timeout(hint_path) or "").strip()
+                content = (_read_text_with_timeout(target) or "").strip()
                 if not content:
                     continue
                 # Skip content we've already injected. The same AGENTS.md is
