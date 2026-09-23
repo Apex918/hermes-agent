@@ -124,23 +124,37 @@ def _approve(subsystem: str, rest: List[str], memory_store) -> str:
             return f"No pending {subsystem} write with id '{target}'."
         targets = [rec]
 
-    applied, failed = 0, []
+    applied, failed, overwritten = 0, [], []
     for rec in targets:
-        ok, msg = _apply_one(subsystem, rec, memory_store, receipt=receipt)
+        ok, msg, result = _apply_one(subsystem, rec, memory_store, receipt=receipt)
         if ok:
             wa.discard_pending(subsystem, rec["id"])
             applied += 1
+            overwritten.extend(f"  {rec['id']}: {text}" for text in _replaced_entries(result))
         else:
             failed.append(f"{rec['id']}: {msg}")
 
     out = [f"Approved {applied} {subsystem} write(s)."]
+    if overwritten:
+        # A memory 'replace' overwrites the WHOLE matched entry (#117952); the approver
+        # is the last person who can notice a clause went missing, so show what was lost.
+        out.append("Overwrote entire entry (re-add anything you still need):")
+        out.extend(overwritten)
     if failed:
         out.append("Failed:")
         out.extend(f"  {f}" for f in failed)
     return "\n".join(out)
 
 
+def _replaced_entries(result: dict) -> List[str]:
+    """Full text of every entry a memory replace overwrote, single-op or batch shape."""
+    single = result.get("replaced_entry")
+    batch = result.get("replaced_entries") or {}
+    return ([single] if single else []) + [batch[k] for k in sorted(batch, key=int)]
+
+
 def _apply_one(subsystem: str, rec, memory_store, *, receipt=None):
+    """``(ok, error, result)`` — *result* is the applier's full payload (empty on exceptions)."""
     payload = rec.get("payload", {})
     try:
         effect = None
@@ -157,15 +171,15 @@ def _apply_one(subsystem: str, rec, memory_store, *, receipt=None):
                 return json.loads(apply_skill_pending(payload))
             effect = _skill_effect
 
-        result = wa.apply_pending(rec, effect, receipt=receipt)
-        if not result.get("success"):
-            return False, result.get("error", "")
-        applied = result.get("result", {})
-        if isinstance(applied, dict):
-            return bool(applied.get("success", True)), applied.get("error", "")
-        return True, ""
+        approval = wa.apply_pending(rec, effect, receipt=receipt)
+        if not approval.get("success"):
+            return False, approval.get("error", ""), {}
+        result = approval.get("result", {})
+        if isinstance(result, dict):
+            return bool(result.get("success", True)), result.get("error", ""), result
+        return True, "", {}
     except Exception as e:
-        return False, str(e)
+        return False, str(e), {}
 
 
 def _reject(subsystem: str, rest: List[str]) -> str:
