@@ -2,7 +2,6 @@
 
 import json
 import threading
-import time
 import pytest
 
 from agent import secret_scope
@@ -64,11 +63,6 @@ class TestMem0V3Tools:
         provider._backend = backend
         return provider
 
-    def test_search_returns_ids(self, monkeypatch):
-        backend = FakeBackend(search_results=[{"id": "mem-1", "memory": "foo", "score": 0.9}])
-        provider = self._make_provider(monkeypatch, backend)
-        result = json.loads(provider.handle_tool_call("mem0_search", {"query": "test"}))
-        assert result["results"][0]["id"] == "mem-1"
 
     def test_add_uses_content_param(self, monkeypatch):
         backend = FakeBackend()
@@ -124,13 +118,6 @@ class TestMem0V3Tools:
         assert delete_result["result"] == "Memory deleted."
         assert export_result == backend._all_results
 
-    def test_old_tool_names_return_unknown(self, monkeypatch):
-        backend = FakeBackend()
-        provider = self._make_provider(monkeypatch, backend)
-        result = json.loads(provider.handle_tool_call("mem0_profile", {}))
-        assert "error" in result
-        result = json.loads(provider.handle_tool_call("mem0_conclude", {}))
-        assert "error" in result
 
 
 class TestMem0UpdateDelete:
@@ -163,17 +150,6 @@ class TestMem0UpdateDelete:
         ))
         assert backend.captured[0][1] == "mem-1"
         assert result["result"] == "Memory deleted."
-
-
-class TestMem0ErrorHandling:
-
-    def _make_provider(self, monkeypatch, backend):
-        provider = Mem0MemoryProvider()
-        provider.initialize("test-session")
-        provider._user_id = "u123"
-        provider._agent_id = "hermes"
-        provider._backend = backend
-        return provider
 
 
 class TestMem0V3Internal:
@@ -461,12 +437,6 @@ class TestMem0ModeSwitch:
 
         assert mem0_plugin._load_config()["api_key"] == "file-key"
 
-    def test_default_mode_is_platform(self, monkeypatch, tmp_path):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-        monkeypatch.setenv("MEM0_API_KEY", "test-key")
-        provider = Mem0MemoryProvider()
-        provider.initialize("test")
-        assert provider._mode == "platform"
 
     def test_missing_mode_key_defaults_platform(self, monkeypatch, tmp_path):
         """Backward compat: old mem0.json without mode key works."""

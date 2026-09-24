@@ -459,6 +459,10 @@ class MemoryProvider(ABC):
           ``parent_session_id``, ``platform``, and ``tool_name``.
 
         Use to mirror built-in memory writes to your backend.
+        For replace/remove, ``metadata["previous_content"]`` is the full entry selected
+        under the native-store lock. Notifications follow a successful complete write
+        or batch; each batch operation sees the preceding operation's result. Older
+        callers may omit this field: ``old_text`` alone is not authoritative identity.
         """
 
     def backup_paths(self) -> List[str]:
