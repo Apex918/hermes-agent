@@ -346,7 +346,7 @@ def list_pending(subsystem: str) -> List[Dict[str, Any]]:
     records: List[Dict[str, Any]] = []
     for p in d.glob("*.json"):
         try:
-            record = json.loads(p.read_text(encoding="utf-8"))
+            record = json.loads(p.read_text(encoding="utf-8-sig"))
             if not isinstance(record, dict):
                 raise ValueError(f"expected a JSON object, got {type(record).__name__}")
             if record.get("status", "pending_approval") == "pending_approval":
@@ -363,7 +363,7 @@ def get_pending(subsystem: str, pending_id: str) -> Optional[Dict[str, Any]]:
     if not path.exists():
         return None
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
         return data if isinstance(data, dict) else None
     except Exception:
         return None
