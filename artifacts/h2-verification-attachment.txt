@@ -1,0 +1,1 @@
+H2 verification: focused 16/16 passed; business suite 140/140 passed; py_compile 0; git diff --check 0. Fresh-process import, fail-closed external-source rejection, coordination-only policy, provenance validation verified. Scope: worktree-only; no network/live/order/write effects.

@@ -1,0 +1,21 @@
+▶ running per-file parallel test suite via run_tests_parallel.py
+  (TZ=UTC LANG=C.UTF-8 PYTHONHASHSEED=0; clean env)
+▶ pre-compiling bytecode cache
+▶ launching test runner
+Discovered 2 test files (~14 tests) under ['tests/business/test_coordination_adapter.py', 'tests/business/test_coordination_adapter_h2.py']; running with -j 16
+[ 21.4% |     3/~14 | ✓3 | ✗0] ✓ tests/business/test_coordination_adapter_h2.py (3✓, 0.6s)
+[100.0% |    14/~14 | ✓16 | ✗ 0] ✓ tests/business/test_coordination_adapter.py (13✓, 0.6s)
+
+=== Summary: 2 files, 16 tests passed, 0 failed (100% complete) in 0.6s (16 workers) ===
+  Durations cached to test_durations.json (2 files)
+
+=== Per-file subprocess time distribution ===
+  Files:   2
+  Total subprocess CPU-wall: 1.2s  (runner wall: 0.6s, parallelism: 16x)
+  P50: 0.60s  P90: 0.60s  P95: 0.60s  P99: 0.60s  Max: 0.60s
+  <1s: 2 files (100%)  <2s: 2 files (100%)
+  Top 10 slowest:
+      0.60s  tests/business/test_coordination_adapter.py
+      0.59s  tests/business/test_coordination_adapter_h2.py
+
+[exit_code=0]
