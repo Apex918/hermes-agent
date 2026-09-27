@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermes.run-evidence.v1",
+  "title": "Hermes source-owned run evidence read projection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "object", "schema", "system", "api_version", "resource", "method", "path",
+    "run_id", "tenant_id", "project_id", "principal_ref", "acl_scope", "source",
+    "source_version", "observed_at", "content_hash", "evidence", "provenance", "acl",
+    "integration_status", "network_access", "external_effects"
+  ],
+  "properties": {
+    "object": {"const": "hermes.readonly.run_evidence"},
+    "schema": {"const": "hermes.run-evidence.v1"},
+    "system": {"const": "hermes"},
+    "api_version": {"const": "v1/0.20.6"},
+    "resource": {"const": "run_evidence"},
+    "method": {"const": "GET"},
+    "path": {"type": "string", "pattern": "^/api/readonly/[^/?#\\\\]+/runs/[^/?#\\\\]+/evidence$"},
+    "run_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "tenant_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "project_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "principal_ref": {"type": "string", "minLength": 1, "maxLength": 256},
+    "acl_scope": {"const": "read:run"},
+    "source": {"const": "hermes-run-evidence-store"},
+    "source_version": {"type": "string", "minLength": 1},
+    "observed_at": {"type": "string", "minLength": 1, "format": "date-time"},
+    "expires_at": {"type": "string", "minLength": 1, "format": "date-time"},
+    "content_hash": {"type": "string", "minLength": 1},
+    "evidence": {},
+    "provenance": {
+      "type": "object",
+      "required": ["kind", "environment"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "environment": {"enum": ["fixture", "sandbox", "staging"]}
+      },
+      "additionalProperties": true
+    },
+    "acl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["principal_ref", "tenant_id", "project_id", "resource"],
+      "properties": {
+        "principal_ref": {"type": "string", "minLength": 1},
+        "tenant_id": {"type": "string", "minLength": 1},
+        "project_id": {"type": "string", "minLength": 1},
+        "resource": {"const": "read:run"}
+      }
+    },
+    "integration_status": {"const": "not_integrated"},
+    "network_access": {"const": false},
+    "external_effects": {"const": 0}
+  }
+}

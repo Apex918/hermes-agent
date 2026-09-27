@@ -1,0 +1,74 @@
+{
+  "schema_version": "hqb.index.operations.fixture.v1",
+  "packet_id": "hqb-offline-packet-001",
+  "tenant_id": "1001",
+  "observed_at": "2026-08-31T09:00:00+00:00",
+  "as_of": "2026-08-31T09:05:00+00:00",
+  "provenance": "hermes:offline-fixture:hqb-001",
+  "integration_status": "not_integrated",
+  "network_access": false,
+  "external_effects": 0,
+  "evidence": [
+    {
+      "kind": "public_catalog_observation",
+      "source_id": "fixture-source-001",
+      "observed_at": "2026-08-31T09:00:00+00:00",
+      "notes": "Synthetic local observation for contract testing."
+    }
+  ],
+  "candidates": [
+    {
+      "candidate_type": "OFFER",
+      "payload": {
+        "sku_profile_id": 101,
+        "supplier_channel_id": 201,
+        "currency_code": "CNY",
+        "unit_price": "12.50000000",
+        "min_order_quantity": "10",
+        "available_quantity": "80",
+        "observed_at": "2026-08-31T09:00:00+00:00"
+      }
+    },
+    {
+      "candidate_type": "QUOTE_OBSERVATION",
+      "payload": {
+        "offer_id": 301,
+        "unit_price": "12.75000000",
+        "currency_code": "CNY",
+        "available_quantity": "75",
+        "observed_at": "2026-08-31T09:00:00+00:00",
+        "valid_until": "2026-09-01T09:00:00+00:00",
+        "approval_status": 1,
+        "source": "fixture"
+      }
+    }
+  ],
+  "readonly_summary": {
+    "mode": "readonly",
+    "method": "GET",
+    "endpoint": "/hqb/pricing/snapshot/page",
+    "tenant_id": "1001",
+    "observed_at": "2026-08-31T09:05:00+00:00",
+    "data": {
+      "total": 1,
+      "list": [
+        {
+          "skuProfileId": 101,
+          "currencyCode": "CNY",
+          "quoteCount": 2,
+          "trustedMedian": "12.62500000",
+          "anomalyCount": 0
+        }
+      ]
+    }
+  },
+  "readback_batches": [
+    {
+      "batch_id": "batch-001",
+      "status": "pending_review",
+      "candidate_count": 2,
+      "candidate_ids": ["candidate-001", "candidate-002"],
+      "verified": true
+    }
+  ]
+}

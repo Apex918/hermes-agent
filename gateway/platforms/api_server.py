@@ -4,6 +4,10 @@ Serves /v1/chat/completions, /v1/responses, /v1/models, /v1/capabilities, /api/s
 /v1/runs, /api/jobs and /health* (full table: ``APIServerAdapter._http_route_table``); any
 OpenAI-compatible frontend connects at http://localhost:8642/v1 with API_SERVER_KEY. Under
 ``gateway.multiplex_profiles`` secondary profiles live at ``/p/<profile>/...``.
+
+Also serves ``GET /api/readonly/{tenant_id}/runs/{run_id}/evidence`` — a
+fixture/sandbox-only, source-owned run-evidence projection that stays absent
+unless a facade is explicitly injected.
 """
 
 import asyncio
@@ -153,6 +157,13 @@ from gateway.browser_control_broker import (
     BROWSER_CONTROL_ARTIFACT_CAPABILITIES, BROWSER_CONTROL_CAPABILITIES, BROWSER_CONTROL_DEVELOPER_CAPABILITIES,
     ControllerScope, ControllerTicketInvalid, browser_control_developer_mode,
     browser_control_protocol_supported, filter_browser_control_capabilities, get_browser_control_broker)
+from gateway.run_evidence_facade import (
+    FACADE_PATH_TEMPLATE as RUN_EVIDENCE_FACADE_PATH,
+    RunEvidenceFacade,
+    RunEvidenceScope,
+    RunEvidenceUnavailable,
+    HermesRunEvidenceStore,
+)
 
 from gateway.platforms._shared import coerce_port as _coerce_port
 from gateway.platforms._shared import get_scoped_secret as _get_scoped_secret
@@ -1215,6 +1226,21 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
         self._response_stores: Dict[str, ResponseStore] = {}
         self._response_store_lock = threading.Lock()
         _api_runs._initialize_run_state(self, store_factory=RunIdempotencyStore)
+        # Optional explicitly injected local projection for the source-owned
+        # read-only run evidence route.  It is intentionally absent by default:
+        # no API request can turn this offline facade into a live integration.
+        self._run_evidence_facade: Optional[RunEvidenceFacade] = None
+        configured_store_path = extra.get(
+            "run_evidence_store_path",
+            os.getenv("HERMES_RUN_EVIDENCE_STORE_PATH", ""),
+        )
+        if isinstance(configured_store_path, str) and configured_store_path.strip():
+            try:
+                evidence_store = HermesRunEvidenceStore.from_jsonl(Path(configured_store_path))
+                self._run_evidence_facade = RunEvidenceFacade(evidence_store)
+            except (OSError, TypeError, ValueError, RunEvidenceUnavailable):
+                # Keep the endpoint fail-closed without logging path contents or records.
+                logger.warning("[api_server] configured run evidence store unavailable")
         self._session_db: Optional[Any] = None  # explicit override (tests/manual wiring)
         self._session_dbs: Dict[str, Any] = {}  # per-profile-home SessionDB cache
         self._session_db_cache_lock = threading.Lock()
@@ -1248,6 +1274,17 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
         # Per-profile single-flight locks for the off-loop store construction in
         # _artifact_store_for_async(); a lost race would strand receipts (in-memory index).
         self._browser_control_artifact_locks: Dict[str, asyncio.Lock] = {}
+
+    def _inject_run_evidence_facade(self, facade: RunEvidenceFacade) -> None:
+        """Inject an offline fixture facade for tests and sandbox validation.
+
+        The explicit type check prevents a caller from smuggling a live
+        transport, credential resolver, or write-capable object into this
+        source-owned GET-only route.  Production startup never calls this.
+        """
+        if type(facade) is not RunEvidenceFacade:
+            raise TypeError("facade must be RunEvidenceFacade")
+        self._run_evidence_facade = facade
 
     def active_agent_work_count(self) -> int:
         """All live agent work: pending admissions + in-flight turns + live /v1/runs tasks
@@ -1645,6 +1682,10 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
             ("POST", "/api/jobs/{job_id}/run", self._handle_run_job)]
         routes.extend(_room_grants._http_routes(self))
         routes.extend(_api_runs._http_routes(self))
+        # Source-owned, fixture/sandbox-only projection.  The route is
+        # deliberately GET-only; the injected facade never owns run
+        # lifecycle or event mutation.
+        routes.append(("GET", RUN_EVIDENCE_FACADE_PATH, self._handle_run_evidence))
         if _CRON_AVAILABLE:
             # Chronos fire webhook (NAS -> agent): authenticated by a NAS-minted JWT.
             routes.append(("POST", "/api/cron/fire", self._handle_cron_fire))
@@ -4222,6 +4263,75 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
     _handle_run_approval = _run_route_delegate("_handle_run_approval")
     _handle_steer_run = _run_route_delegate("_handle_steer_run")
     _handle_stop_run = _run_route_delegate("_handle_stop_run")
+
+    async def _handle_run_evidence(self, request: "web.Request") -> "web.Response":
+        """GET the explicitly injected local run-evidence projection.
+
+        Authentication remains owned by the API server (API_SERVER_KEY, with
+        mTLS termination outside this adapter).  The projection itself still
+        requires target-derived principal, tenant, project, and exact ACL
+        headers.  No request body/query and no lifecycle mutation are allowed.
+        """
+        auth_err = self._check_auth(request)
+        if auth_err:
+            return auth_err
+        if request.query:
+            return web.json_response(
+                _openai_error("Query parameters are not allowed", code="query_not_allowed"),
+                status=400,
+            )
+        transfer_encoding = request.headers.get("Transfer-Encoding", "")
+        if any(token.strip().lower() == "chunked" for token in transfer_encoding.split(",")):
+            return web.json_response(
+                _openai_error("GET request body is not allowed", code="body_not_allowed"),
+                status=400,
+            )
+        if request.content_length not in (None, 0):
+            return web.json_response(
+                _openai_error("GET request body is not allowed", code="body_not_allowed"),
+                status=400,
+            )
+
+        facade = self._run_evidence_facade
+        if facade is None:
+            return web.json_response(
+                _openai_error(
+                    "Run evidence facade is unavailable in this non-integrated server",
+                    err_type="server_error",
+                    code="run_evidence_facade_unavailable",
+                ),
+                status=503,
+            )
+
+        tenant_id = request.match_info.get("tenant_id", "")
+        run_id = request.match_info.get("run_id", "")
+        principal_ref = request.headers.get("X-Principal-Ref", "")
+        project_id = request.headers.get("X-Project-Id", "")
+        acl_scope = request.headers.get("X-ACL-Scope", "")
+        try:
+            scope = RunEvidenceScope(
+                principal_ref=principal_ref,
+                tenant_id=request.headers.get("X-Tenant-Id", ""),
+                project_id=project_id,
+                acl_scope=acl_scope,
+            )
+            projection = facade.read(
+                tenant_id,
+                run_id,
+                scope,
+                credential_ref=request.headers.get("X-Credential-Ref"),
+            )
+        except ValueError as exc:
+            return web.json_response(
+                _openai_error(str(exc), code="invalid_read_scope"),
+                status=400,
+            )
+        except RunEvidenceUnavailable as exc:
+            return web.json_response(
+                _openai_error(str(exc), code="run_evidence_unavailable"),
+                status=403,
+            )
+        return web.json_response(projection)
 
     async def _sweep_orphaned_runs(self) -> None:
         return await _api_runs._sweep_orphaned_runs(self)
