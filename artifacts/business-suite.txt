@@ -1,0 +1,42 @@
+▶ running per-file parallel test suite via run_tests_parallel.py
+  (TZ=UTC LANG=C.UTF-8 PYTHONHASHSEED=0; clean env)
+▶ pre-compiling bytecode cache
+▶ launching test runner
+Discovered 15 test files (~101 tests) under ['tests/business']; running with -j 16
+[  3.0% |     3/~101 | ✓3 | ✗0] ✓ tests/business/test_fixtures.py (3✓, 1.8s)
+[  5.9% |     6/~101 | ✓6 | ✗0] ✓ tests/business/test_ai_business_os.py (3✓, 1.9s)
+[ 10.9% |    11/~101 | ✓12 | ✗ 0] ✓ tests/business/test_ai_business_os_twenty_sandbox.py (6✓, 1.9s)
+[ 15.8% |    16/~101 | ✓17 | ✗ 0] ✓ tests/business/test_ai_business_os_crm_provider.py (5✓, 2.0s)
+[ 18.8% |    19/~101 | ✓20 | ✗ 0] ✓ tests/business/test_coordination_adapter_h2.py (3✓, 2.0s)
+[ 24.8% |    25/~101 | ✓26 | ✗ 0] ✓ tests/business/test_role_packs.py (6✓, 2.0s)
+[ 27.7% |    28/~101 | ✓29 | ✗ 0] ✓ tests/business/test_cto_vertical_slice.py (3✓, 2.0s)
+[ 34.7% |    35/~101 | ✓36 | ✗ 0] ✓ tests/business/test_meeting_task_pol.py (7✓, 2.1s)
+[ 42.6% |    43/~101 | ✓44 | ✗ 0] ✓ tests/business/test_feishu_fixtures.py (8✓, 2.1s)
+[ 48.5% |    49/~101 | ✓50 | ✗ 0] ✓ tests/business/test_feishu_explicit_adapter.py (6✓, 2.1s)
+[ 60.4% |    61/~101 | ✓62 | ✗ 0] ✓ tests/business/test_ai_business_os_approval_state_machine.py (12✓, 2.1s)
+[ 71.3% |    72/~101 | ✓75 | ✗ 0] ✓ tests/business/test_coordination_adapter.py (13✓, 2.2s)
+[ 77.2% |    78/~101 | ✓99 | ✗ 0] ✓ tests/business/test_ai_business_os_contracts.py (24✓, 2.1s)
+[ 93.1% |    94/~101 | ✓115 | ✗  0] ✓ tests/business/test_lark_cli_provider.py (16✓, 2.1s)
+[100.0% |   101/~101 | ✓140 | ✗  0] ✓ tests/business/test_ai_business_os_n1_contracts.py (25✓, 2.2s)
+
+=== Summary: 15 files, 140 tests passed, 0 failed (100% complete) in 2.2s (16 workers) ===
+  Durations cached to test_durations.json (15 files)
+
+=== Per-file subprocess time distribution ===
+  Files:   15
+  Total subprocess CPU-wall: 30.6s  (runner wall: 2.2s, parallelism: 16x)
+  P50: 2.07s  P90: 2.16s  P95: 2.20s  P99: 2.20s  Max: 2.20s
+  <1s: 0 files (0%)  <2s: 6 files (40%)
+  Top 10 slowest:
+      2.20s  tests/business/test_ai_business_os_n1_contracts.py
+      2.16s  tests/business/test_coordination_adapter.py
+      2.14s  tests/business/test_ai_business_os_approval_state_machine.py
+      2.14s  tests/business/test_ai_business_os_contracts.py
+      2.09s  tests/business/test_feishu_explicit_adapter.py
+      2.08s  tests/business/test_meeting_task_pol.py
+      2.08s  tests/business/test_lark_cli_provider.py
+      2.07s  tests/business/test_feishu_fixtures.py
+      2.01s  tests/business/test_role_packs.py
+      2.00s  tests/business/test_cto_vertical_slice.py
+
+[exit_code=0]

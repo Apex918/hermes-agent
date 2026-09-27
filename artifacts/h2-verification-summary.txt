@@ -1,0 +1,20 @@
+H2 Hermes adapter verification
+
+Commands run (CI-parity runner):
+1. scripts/run_tests.sh tests/business/test_coordination_adapter.py tests/business/test_coordination_adapter_h2.py -q
+   Result: 2 files, 16 tests passed, 0 failed; exit_code=0.
+2. scripts/run_tests.sh tests/business/ -q
+   Result: 15 files, 140 tests passed, 0 failed; exit_code=0.
+3. python -m py_compile business/ai_business_os/coordination_adapter.py business/ai_business_os/__init__.py tests/business/test_coordination_adapter.py tests/business/test_coordination_adapter_h2.py
+   Result: exit_code=0.
+4. git diff --check
+   Result: exit_code=0.
+
+H2 coverage verified:
+- Fresh-process public import and alias registration.
+- Existing Hermes Orchestrator planning boundary.
+- Coordination-only policy: no network, live trading, order submission, or external effects.
+- External source rejection before planning.
+- Local artifact provenance and input validation.
+
+Scope: worktree-only / coordination-only. No production integration or live effects.

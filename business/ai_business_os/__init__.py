@@ -81,6 +81,17 @@ from .twenty_sandbox import (
     build_twenty_sandbox_proof,
     load_twenty_sandbox_fixture,
 )
+from .coordination_adapter import (
+    CoordinationAdapter,
+    CoordinationAdapterError,
+    CoordinationContext,
+    CoordinationPolicy,
+    CoordinationResult,
+    HermesCoordinationAdapter,
+    INTEGRATION_STATUS,
+    Mission,
+    OfflinePolicyError,
+)
 
 __all__ = [
     "ActionRequest",
@@ -96,6 +107,11 @@ __all__ = [
     "CRMWriteProposal",
     "ConnectorAllowlist",
     "ConnectorNotAllowedError",
+    "CoordinationAdapter",
+    "CoordinationAdapterError",
+    "CoordinationContext",
+    "CoordinationPolicy",
+    "CoordinationResult",
     "ContractValidationError",
     "CTOAgent",
     "DEFAULT_FEISHU_FIXTURE_PATH",
@@ -127,6 +143,10 @@ __all__ = [
     "LarkCLIError",
     "LarkCLIProtocolError",
     "LarkCLIProvider",
+    "HermesCoordinationAdapter",
+    "INTEGRATION_STATUS",
+    "Mission",
+    "OfflinePolicyError",
     "OfflineFeishuEventStore",
     "OperationNotFoundError",
     "ProductionWriteDisabled",

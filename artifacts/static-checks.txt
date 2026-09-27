@@ -1,0 +1,4 @@
+$ python -m py_compile business/ai_business_os/coordination_adapter.py business/ai_business_os/__init__.py tests/business/test_coordination_adapter.py tests/business/test_coordination_adapter_h2.py
+[py_compile_exit_code=0]
+$ git diff --check
+[git_diff_check_exit_code=0]
