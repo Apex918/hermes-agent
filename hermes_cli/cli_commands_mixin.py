@@ -1487,6 +1487,8 @@ class CLICommandsMixin:
             active_path = str(active.get("path") or "")
             tree_records = [record for record in tree_records if record.path != active_path]
         actions = worktree_gc.reclaim_worktrees(repo_root, dry_run=dry_run, records=tree_records)
+        nightly_records = worktree_gc.audit_nightly_trees(repo_root, with_sizes=False)
+        actions += worktree_gc.reclaim_nightly_trees(repo_root, dry_run=dry_run, records=nightly_records)
         actions += worktree_gc.reclaim_branches(repo_root, dry_run=dry_run)
         if actions:
             _pr(*(f"  {line}" for line in actions),

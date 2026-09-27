@@ -9,7 +9,9 @@ the entire value of these tests is exercising actual git verdicts):
 - unique unpushed commits          → keep
 - patch-equivalent commits (rebase/squash-merge leak) → reap
 - live-locked tree                 → keep
-- kanban t_<hex> tree              → keep (owned by kanban gc)
+- kanban t_<hex> tree, task open   → keep (owned by kanban gc)
+- kanban t_<hex> tree, task done   → reap-keep-branch (scratch reclaimed, branch kept)
+- nightly-loop external tree       → reap-keep-branch (branch kept); dirty/locked → keep
 - branch GC: merged branch deleted, unique-commit branch kept,
   checked-out branch kept, protected names kept
 - reclaim operates ONLY on the frozen audit list (concurrent-session trap)
@@ -86,6 +88,19 @@ def _verdict(records, name):
     match = [record for record in records if record.name == name]
     assert match, f"no record for {name}"
     return match[0]
+
+
+def _write_kanban_status(home, task_id, status):
+    """Materialize a minimal kanban board so ``_kanban_task_status`` reads a real row."""
+    import sqlite3
+    home.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(home / "kanban.db"))
+    try:
+        conn.execute("CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, status TEXT)")
+        conn.execute("INSERT OR REPLACE INTO tasks (id, status) VALUES (?, ?)", (task_id, status))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 class TestAuditVerdicts:
@@ -191,12 +206,46 @@ class TestAuditVerdicts:
         assert record.verdict == "keep"
         assert "in use" in record.reason
 
-    def test_kanban_tree_untouched(self, repo):
+    def test_kanban_tree_open_task_kept(self, repo):
+        """A non-terminal (or unknown) kanban task owns its tree; the sweep leaves it."""
         _add_worktree(repo, "t_deadbeef", branch="kanban/t_deadbeef")
         records = worktree_gc.audit_worktrees(str(repo), with_sizes=False)
         record = _verdict(records, "t_deadbeef")
         assert record.verdict == "keep"
         assert "kanban" in record.reason
+
+    def test_kanban_tree_done_task_reaps_but_keeps_branch(self, repo, tmp_path, monkeypatch):
+        """Kanban's own completion cleanup preserves dirty/unpushed trees, so a finished
+        task's checkout leaks forever. Once the task is terminal the checkout is
+        redundant — reclaim it, keep the branch (no commit is ever lost)."""
+        monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path / "khome"))
+        _write_kanban_status(tmp_path / "khome", "t_deadbeef", "done")
+        tree, branch = _add_worktree(repo, "t_deadbeef", branch="kanban/t_deadbeef")
+        records = worktree_gc.audit_worktrees(str(repo), with_sizes=False)
+        assert _verdict(records, "t_deadbeef").verdict == "reap-keep-branch"
+        worktree_gc.reclaim_worktrees(str(repo), records=records)
+        assert not tree.exists()
+        assert _git(["rev-parse", "--verify", branch], repo), "branch must survive the reap"
+
+    def test_kanban_tree_done_task_with_tracked_edits_kept(self, repo, tmp_path, monkeypatch):
+        monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path / "khome"))
+        _write_kanban_status(tmp_path / "khome", "t_deadbeef", "done")
+        tree, _ = _add_worktree(repo, "t_deadbeef", branch="kanban/t_deadbeef")
+        (tree / "README.md").write_text("edited\n")
+        records = worktree_gc.audit_worktrees(str(repo), with_sizes=False)
+        record = _verdict(records, "t_deadbeef")
+        assert record.verdict == "keep"
+        assert "tracked" in record.reason
+
+    def test_kanban_tree_done_task_detached_head_kept(self, repo, tmp_path, monkeypatch):
+        monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path / "khome"))
+        _write_kanban_status(tmp_path / "khome", "t_deadbeef", "done")
+        tree = repo / ".worktrees" / "t_deadbeef"
+        _git(["worktree", "add", "--detach", str(tree)], repo)
+        records = worktree_gc.audit_worktrees(str(repo), with_sizes=False)
+        record = _verdict(records, "t_deadbeef")
+        assert record.verdict == "keep"
+        assert "detached" in record.reason
 
 
 class TestReclaim:
@@ -398,6 +447,53 @@ class TestExternalTrees:
         )
 
 
+class TestNightlyTrees:
+    def test_nightly_external_tree_reaped_branch_kept(self, repo, tmp_path):
+        """The retired nightly loop's scratch checkout lives OUTSIDE .worktrees/, so the
+        managed sweep never saw it. It is reclaimable — checkout removed, branch kept,
+        untracked scratch archived (never destroyed)."""
+        ext = tmp_path / "nightly-run"
+        _git(["worktree", "add", str(ext), "-b", "nightly/hermes-opt-20260101-run01"], repo)
+        (ext / "scratch.log").write_text("evidence\n")
+
+        records = worktree_gc.audit_nightly_trees(str(repo), with_sizes=False)
+        record = _verdict(records, "nightly-run")
+        assert record.verdict == "reap-keep-branch"
+        assert record.untracked == ["scratch.log"]
+
+        worktree_gc.reclaim_nightly_trees(str(repo), records=records)
+        assert not ext.exists()
+        assert _git(["rev-parse", "--verify", "nightly/hermes-opt-20260101-run01"], repo)
+        assert list(tmp_path.rglob("scratch.log")), "untracked scratch must be archived"
+
+    def test_non_nightly_external_tree_never_reclaimed(self, repo, tmp_path):
+        """Hand-made external trees are someone else's state — the nightly exception
+        must not widen to them."""
+        ext = tmp_path / "handmade-tree"
+        _git(["worktree", "add", str(ext), "-b", "ext/handmade"], repo)
+        records = worktree_gc.audit_nightly_trees(str(repo), with_sizes=False)
+        assert all(r.name != "handmade-tree" for r in records)
+        worktree_gc.reclaim_nightly_trees(str(repo), records=records)
+        assert ext.exists()
+
+    def test_nightly_tree_with_tracked_edits_kept(self, repo, tmp_path):
+        ext = tmp_path / "nightly-dirty"
+        _git(["worktree", "add", str(ext), "-b", "nightly/dirty-run"], repo)
+        (ext / "README.md").write_text("edited\n")
+        records = worktree_gc.audit_nightly_trees(str(repo), with_sizes=False)
+        record = _verdict(records, "nightly-dirty")
+        assert record.verdict == "keep"
+        assert "tracked" in record.reason
+
+    def test_young_nightly_tree_kept_under_older_than(self, repo, tmp_path):
+        ext = tmp_path / "nightly-young"
+        _git(["worktree", "add", str(ext), "-b", "nightly/young-run"], repo)
+        records = worktree_gc.audit_nightly_trees(str(repo), with_sizes=False, older_than_days=7)
+        record = _verdict(records, "nightly-young")
+        assert record.verdict == "keep"
+        assert "older-than" in record.reason
+
+
 class TestCmdWorktreeJson:
     def _ns(self, repo, action, **kw):
         import argparse
@@ -418,7 +514,7 @@ class TestCmdWorktreeJson:
         _add_worktree(repo, "hermes-json")
         assert cmd_worktree(self._ns(repo, "list")) == 0
         payload = json.loads(capsys.readouterr().out)
-        assert set(payload) == {"repo", "trees", "external_trees", "branches"}
+        assert set(payload) == {"repo", "trees", "external_trees", "nightly_trees", "branches"}
         names = [t["name"] for t in payload["trees"]]
         assert "hermes-json" in names
         tree = [t for t in payload["trees"] if t["name"] == "hermes-json"][0]

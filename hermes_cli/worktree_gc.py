@@ -23,8 +23,19 @@ logger = logging.getLogger(__name__)
 # Branches never considered for deletion, in any mode.
 _PROTECTED_BRANCHES = {"main", "master", "develop", "dev", "trunk"}
 
-# Trees owned by another lifecycle (kanban dispatcher gc) — never touched.
+# Kanban task trees (``<repo>/.worktrees/t_<hex>``). Kanban owns their lifecycle,
+# but its completion-time cleanup PRESERVES any tree still holding dirty or
+# unpushed work — so a finished task's scratch checkout leaks forever with no
+# further reclamation. They are therefore only protected while the task is
+# non-terminal; once the task is done the scratch checkout is reclaimable (the
+# branch is always kept, so no commit is ever lost).
 _KANBAN_RE = re.compile(r"^t_[0-9a-f]+$")
+_KANBAN_TERMINAL_STATUSES = {"done", "archived"}
+
+# The nightly optimization loop materializes its worktree OUTSIDE ``.worktrees/``
+# (a sibling directory), so the managed reclaim never saw it and every run
+# leaked one. Its scratch branches live in this namespace.
+_NIGHTLY_BRANCH_RE = re.compile(r"^nightly/")
 
 # Bounded cherry probe: a branch this far ahead of upstream is a stale-base
 # lane, not merged scratch; checking it is expensive and it stays preserved.
@@ -59,7 +70,9 @@ def _run(cmd: list, timeout: int, cwd: Optional[str] = None) -> subprocess.Compl
 class ExternalTreeRecord:
     """A linked worktree registered on the repo but living OUTSIDE
     ``.worktrees/`` — created by hand or by another tool. Reported for
-    visibility only; the reclaim paths never touch these."""
+    visibility only; the generic reclaim never touches these. The one
+    exception is ``audit_nightly_trees``, which reclaims the retired nightly
+    loop's own scratch checkouts (``nightly/`` branches)."""
 
     path: str
     branch: str           # branch name, or "detached @<sha>" when detached
@@ -121,11 +134,66 @@ def _archive_untracked(tree: Path, untracked: List[str]) -> Optional[Path]:
         return None
 
 
+def _kanban_task_status(task_id: str) -> Optional[str]:
+    """Status of a kanban task by id, searched across every board — or ``None``.
+
+    Read-only (``mode=ro``) and best-effort: a missing/locked/corrupt board, an
+    import failure, or an id that lives on no board all yield ``None``, which
+    callers treat as "not terminal" (keep). Fail-safe by construction — an
+    unreadable board can never doom a tree.
+    """
+    try:
+        from hermes_cli import kanban_db as _kdb
+    except Exception:
+        return None
+    import sqlite3
+
+    boards = ["default"]
+    try:
+        root = _kdb.boards_root()
+        if root.is_dir():
+            boards += sorted(p.name for p in root.iterdir() if p.is_dir())
+    except Exception:
+        pass
+    for slug in boards:
+        try:
+            db = _kdb.kanban_db_path(slug)
+        except Exception:
+            continue
+        try:
+            if not db.exists():
+                continue
+            conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=5)
+            try:
+                row = conn.execute("SELECT status FROM tasks WHERE id = ?", (task_id,)).fetchone()
+            finally:
+                conn.close()
+        except Exception:
+            continue
+        if row:
+            return row[0]
+    return None
+
+
 def _classify_tree(_ops, repo_root: str, entry: Path, merge_cache, remote_heads) -> tuple[str, str, List[str]]:
     """Return (verdict, reason, untracked) for one tree under ``.worktrees/``."""
     path = str(entry)
     if _KANBAN_RE.match(entry.name):
-        return "keep", "kanban task tree (owned by kanban gc)", []
+        status = _kanban_task_status(entry.name)
+        if status not in _KANBAN_TERMINAL_STATUSES:
+            return "keep", f"kanban task tree (task {status or 'unknown'})", []
+        # Task is finished: its scratch checkout is redundant, but the branch may
+        # hold commits that exist nowhere else — reclaim the checkout, keep the
+        # branch. Tracked edits or a detached HEAD mean the work is not safely
+        # anchored to a ref, so those stay.
+        tracked_dirty, untracked = _dirty_split(path)
+        if tracked_dirty:
+            return "keep", "kanban task done; uncommitted tracked changes (real work)", []
+        branch = _git(["branch", "--show-current"], cwd=path, timeout=5).stdout.strip()
+        if not branch:
+            return "keep", "kanban task done; detached HEAD (commits have no branch)", []
+        note = f"; {len(untracked)} untracked file(s) will be archived" if untracked else ""
+        return "reap-keep-branch", f"kanban task done; scratch checkout reclaimed, branch kept{note}", untracked
     if _ops._worktree_lock_is_live(repo_root, path, timeout=5) == "live":
         return "keep", "in use by a running hermes session", []
     tracked_dirty, untracked = _dirty_split(path)
@@ -223,6 +291,57 @@ def prune_missing_registrations(repo_root: str, *, dry_run: bool = False) -> Lis
     return [f"pruned stale registration {r.path}" for r in stale]
 
 
+def _classify_nightly_tree(_ops, repo_root: str, entry: Path) -> tuple[str, str, List[str]]:
+    """Verdict for one of the retired nightly loop's external scratch checkouts.
+
+    A finished nightly run's checkout is redundant — the branch is always kept, so no
+    commit is lost — but a live lock or tracked edits mean it is not safe to touch.
+    Untracked scratch is archived before removal (done by the reclaimer).
+    """
+    path = str(entry)
+    if _ops._worktree_lock_is_live(repo_root, path, timeout=5) == "live":
+        return "keep", "in use by a running hermes session", []
+    tracked_dirty, untracked = _dirty_split(path)
+    if tracked_dirty:
+        return "keep", "uncommitted tracked changes (real work)", []
+    note = f"; {len(untracked)} untracked file(s) will be archived" if untracked else ""
+    return "reap-keep-branch", f"finished nightly run; scratch checkout reclaimed, branch kept{note}", untracked
+
+
+def audit_nightly_trees(repo_root: str, *, with_sizes: bool = True,
+                        older_than_days: Optional[float] = None) -> List[TreeRecord]:
+    """Classify the retired nightly loop's external worktrees for reclaim.
+
+    The nightly optimization loop materialized its scratch checkout in a SIBLING
+    directory (``hermes-optimization-worktrees/``) instead of ``<repo>/.worktrees/``,
+    so the managed sweep never saw it and every run leaked one. Those trees are still
+    registered on the repo and ``audit_external_trees`` reports them, but the generic
+    reclaim deliberately ignores external trees — so they leaked forever. This narrows
+    the exception to the loop's own namespace (``nightly/`` branches); hand-made
+    external trees (``three-system-*``, ``hqb-*``) are never touched.
+    """
+    from hermes_cli import worktree_ops as _ops
+    now = time.time()
+    records: List[TreeRecord] = []
+    for ext in audit_external_trees(repo_root):
+        if ext.missing or not _NIGHTLY_BRANCH_RE.match(ext.branch):
+            continue
+        entry = Path(ext.path)
+        try:
+            age_days = (now - entry.stat().st_mtime) / 86400.0
+        except Exception:
+            continue
+        verdict, reason, untracked = _classify_nightly_tree(_ops, repo_root, entry)
+        if older_than_days is not None and verdict in _REAP_VERDICTS and age_days < older_than_days:
+            verdict, reason, untracked = "keep", (
+                f"reapable but only {age_days:.1f}d old (--older-than {older_than_days:g})"), []
+        records.append(TreeRecord(
+            name=entry.name, path=str(entry), branch=ext.branch,
+            age_days=age_days, size_mb=_tree_size_mb(entry) if with_sizes else None,
+            verdict=verdict, reason=reason, untracked=untracked))
+    return records
+
+
 def audit_worktrees(repo_root: str, *, with_sizes: bool = True,
                     older_than_days: Optional[float] = None) -> List[TreeRecord]:
     """Classify every tree under ``.worktrees/`` without mutating anything.
@@ -273,13 +392,9 @@ def audit_worktrees(repo_root: str, *, with_sizes: bool = True,
 _REAP_VERDICTS = {"reap", "reap-archive", "reap-keep-branch"}
 
 
-def reclaim_worktrees(
-    repo_root: str, *, dry_run: bool = False, records: Optional[List[TreeRecord]] = None
-) -> List[str]:
+def _reclaim_records(repo_root: str, records: List[TreeRecord], *, dry_run: bool) -> List[str]:
     """Remove every reap-verdict tree from a frozen audit list — never re-globs inside the
     destructive loop, so trees created by concurrent sessions after the audit are out of scope."""
-    if records is None:
-        records = audit_worktrees(repo_root, with_sizes=False)
     actions: List[str] = []
     for record in records:
         if record.verdict not in _REAP_VERDICTS:
@@ -305,18 +420,40 @@ def reclaim_worktrees(
                 actions.append(f"failed to remove {record.name}: {remove_result.stderr.strip()}")
                 continue
             if record.verdict == "reap-keep-branch":
-                actions.append(f"removed {record.name} (branch {record.branch} kept — pushed open-PR lane)")
+                actions.append(f"removed {record.name} (branch {record.branch} kept)")
                 continue
             if record.branch and record.branch not in _PROTECTED_BRANCHES:
                 _git(["branch", "-D", record.branch], cwd=repo_root, timeout=10)
             actions.append(f"removed {record.name}")
         except Exception as exc:
             actions.append(f"failed to remove {record.name}: {exc}")
+    return actions
 
+
+def reclaim_worktrees(
+    repo_root: str, *, dry_run: bool = False, records: Optional[List[TreeRecord]] = None
+) -> List[str]:
+    """Reclaim every reap-verdict tree under ``.worktrees/``."""
+    if records is None:
+        records = audit_worktrees(repo_root, with_sizes=False)
+    actions = _reclaim_records(repo_root, records, dry_run=dry_run)
     if not dry_run:
         with contextlib.suppress(Exception):
             _git(["worktree", "prune"], cwd=repo_root, timeout=15)
     return actions
+
+
+def reclaim_nightly_trees(
+    repo_root: str, *, dry_run: bool = False, records: Optional[List[TreeRecord]] = None
+) -> List[str]:
+    """Reclaim the retired nightly loop's external scratch checkouts (branch kept).
+
+    Mirrors ``reclaim_worktrees`` for the trees that live outside ``.worktrees/``; the
+    shared reclaimer keeps every branch, so no commit is ever lost.
+    """
+    if records is None:
+        records = audit_nightly_trees(repo_root, with_sizes=False)
+    return _reclaim_records(repo_root, records, dry_run=dry_run)
 
 
 def audit_branches(repo_root: str) -> List[BranchRecord]:

@@ -20,12 +20,14 @@ def _list(worktree_gc, repo_root: str, args) -> int:
     older_than = getattr(args, "older_than", None)
     records = worktree_gc.audit_worktrees(repo_root, older_than_days=older_than)
     external = worktree_gc.audit_external_trees(repo_root)
+    nightly = worktree_gc.audit_nightly_trees(repo_root, older_than_days=older_than)
     branch_records = worktree_gc.audit_branches(repo_root)
     if getattr(args, "json", False):
         print(json.dumps({
             "repo": repo_root,
             "trees": [asdict(r) for r in records],
             "external_trees": [asdict(r) for r in external],
+            "nightly_trees": [asdict(r) for r in nightly],
             "branches": [asdict(b) for b in branch_records],
         }, indent=2))
         return 0
@@ -41,13 +43,22 @@ def _list(worktree_gc, repo_root: str, args) -> int:
         print(
             f"\n{len(records)} tree(s), {_fmt_size(total_mb)} total — "
             f"{_fmt_size(reapable_mb)} reclaimable now via `hermes worktree prune`.")
-    if external:
-        print(f"\n{len(external)} externally-registered worktree(s) (never touched by prune):")
-        for e in external:
+    nightly_paths = {r.path for r in nightly}
+    other_external = [e for e in external if e.path not in nightly_paths]
+    if other_external:
+        print(f"\n{len(other_external)} externally-registered worktree(s) (never touched by prune):")
+        for e in other_external:
             state = "MISSING" if e.missing else ("locked" if e.locked else "ok")
             print(f"  {e.path}  [{e.branch or '?'}]  {state}")
-        if any(e.missing and not e.locked for e in external):
+        if any(e.missing and not e.locked for e in other_external):
             print("  Stale registrations (MISSING) are cleaned by `hermes worktree prune` (metadata only).")
+    if nightly:
+        total_mb = sum(r.size_mb or 0 for r in nightly)
+        reapable_mb = sum(r.size_mb or 0 for r in nightly if r.verdict.startswith("reap"))
+        print(f"\n{len(nightly)} nightly-loop external tree(s), {_fmt_size(total_mb)} total — "
+              f"{_fmt_size(reapable_mb)} reclaimable (branch kept):")
+        for r in sorted(nightly, key=lambda x: -(x.size_mb or 0)):
+            print(f"  {r.name[:40]:40} {r.age_days:>5.1f}d {_fmt_size(r.size_mb):>6} {r.verdict:13} {r.reason}")
     deletable = [b for b in branch_records if b.verdict == "delete"]
     if deletable:
         print(f"{len(deletable)} local branch(es) fully merged/patch-equivalent upstream would also be deleted.")
@@ -64,6 +75,8 @@ def _prune(worktree_gc, repo_root: str, args) -> int:
         actions += worktree_gc.prune_missing_registrations(repo_root, dry_run=dry_run)
         tree_records = worktree_gc.audit_worktrees(repo_root, with_sizes=False, older_than_days=older_than)
         actions += worktree_gc.reclaim_worktrees(repo_root, dry_run=dry_run, records=tree_records)
+        nightly_records = worktree_gc.audit_nightly_trees(repo_root, with_sizes=False, older_than_days=older_than)
+        actions += worktree_gc.reclaim_nightly_trees(repo_root, dry_run=dry_run, records=nightly_records)
         kept = [r for r in tree_records if r.verdict == "keep"
                 and "kanban" not in r.reason and "in use" not in r.reason]
         if kept and not as_json:
