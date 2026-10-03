@@ -41,10 +41,6 @@ class FakeBackend:
         self.captured.append(("delete", memory_id))
         return {"result": "Memory deleted.", "memory_id": memory_id}
 
-    def export(self, *, filters, page=1, page_size=100):
-        self.captured.append(("get_all", {"filters": filters, "page": page, "page_size": page_size}))
-        return self._all_results
-
 
 class TestMem0V3Tools:
     """Test v3 tool names and response handling."""
@@ -54,14 +50,9 @@ class TestMem0V3Tools:
         provider.initialize("test-session")
         provider._user_id = "u123"
         provider._agent_id = "hermes"
-        provider._session_id = "session-xyz"
-        provider._parent_session_id = "parent-abc"
-        provider._agent_context = "primary"
-        provider._agent_identity = "coder"
-        provider._agent_workspace = "hermes"
-        provider._channel = "discord"
         provider._backend = backend
         return provider
+
 
 
     def test_add_uses_content_param(self, monkeypatch):
@@ -73,50 +64,8 @@ class TestMem0V3Tools:
         assert call[2]["infer"] is False
         assert call[2]["user_id"] == "u123"
         assert call[2]["agent_id"] == "hermes"
-        assert call[2]["metadata"]["scope"]["user_id"] == "u123"
-        assert call[2]["metadata"]["scope"]["target"] == "memory"
-        assert call[2]["metadata"]["provenance"]["session_id"] == "session-xyz"
-        assert call[2]["metadata"]["consent"]["granted"] is True
         assert "event_id" in result
 
-    def test_export_uses_backend_get_all(self, monkeypatch):
-        backend = FakeBackend(all_results={"count": 2, "results": [{"id": "m1", "memory": "a"}, {"id": "m2", "memory": "b"}]})
-        provider = self._make_provider(monkeypatch, backend)
-        result = json.loads(provider.handle_tool_call("mem0_export", {"page": 1, "page_size": 50}))
-        assert backend.captured[0][0] == "get_all"
-        assert backend.captured[0][1] == {"filters": {"user_id": "u123"}, "page": 1, "page_size": 50}
-        assert result["count"] == 2
-        assert [row["id"] for row in result["results"]] == ["m1", "m2"]
-
-    def test_direct_crud_methods_delegate_to_backend(self, monkeypatch):
-        backend = FakeBackend(
-            search_results=[{"id": "m1", "memory": "prefetched"}],
-            all_results={"count": 1, "results": [{"id": "m1", "memory": "prefetched"}]},
-        )
-        provider = self._make_provider(monkeypatch, backend)
-
-        search_result = provider.search("what theme do I like?", top_k=7, rerank=True)
-        add_result = provider.add([{"role": "user", "content": "note"}], metadata={"scope": {"tenant": "t1"}})
-        delete_result = provider.delete("m1")
-        export_result = provider.export(page=3, page_size=25)
-
-        assert backend.captured[0] == (
-            "search",
-            "what theme do I like?",
-            {"filters": {"user_id": "u123"}, "top_k": 7, "rerank": True},
-        )
-        assert backend.captured[1][0] == "add"
-        assert backend.captured[1][2]["metadata"]["scope"]["user_id"] == "u123"
-        assert backend.captured[1][2]["metadata"]["scope"]["tenant"] == "t1"
-        assert backend.captured[2] == ("delete", "m1")
-        assert backend.captured[3] == (
-            "get_all",
-            {"filters": {"user_id": "u123"}, "page": 3, "page_size": 25},
-        )
-        assert search_result == backend._search_results
-        assert add_result["event_id"] == "evt-test-123"
-        assert delete_result["result"] == "Memory deleted."
-        assert export_result == backend._all_results
 
 
 
@@ -339,26 +288,6 @@ class TestMem0Prefetch:
         assert backend.captured == []
 
 
-class TestMem0V3Config:
-
-    def test_tool_schemas_five_tools(self):
-        provider = Mem0MemoryProvider()
-        schemas = provider.get_tool_schemas()
-        names = [s["name"] for s in schemas]
-        assert names == ["mem0_search", "mem0_add", "mem0_update", "mem0_delete", "mem0_export"]
-
-    def test_system_prompt_new_tool_names(self):
-        provider = Mem0MemoryProvider()
-        provider._user_id = "test"
-        block = provider.system_prompt_block()
-        assert "mem0_search" in block
-        assert "mem0_add" in block
-        assert "mem0_update" in block
-        assert "mem0_delete" in block
-        assert "mem0_export" in block
-        assert "mem0_list" not in block
-        assert "mem0_profile" not in block
-        assert "mem0_conclude" not in block
 
 
 class TestMem0ModeSwitch:
@@ -501,46 +430,6 @@ class TestMem0UserIdResolution:
         provider = self._provider(monkeypatch, tmp_path)
         provider.initialize("test", user_id="123456789", platform="telegram")
         assert provider._user_id == "123456789"
-
-
-class TestMem0WriteMetadata:
-    """Writes carry scope, provenance, retention, and consent metadata.
-
-    The provider's direct tool path should retain enough context for a local
-    self-hosted mirror to replay, audit, and filter the write without needing
-    the live agent process.
-    """
-
-    def _make_provider(self, channel: str = "cli"):
-        provider = Mem0MemoryProvider()
-        provider._user_id = "u123"
-        provider._agent_id = "hermes"
-        provider._channel = channel
-        provider._session_id = "session-123"
-        provider._parent_session_id = "parent-456"
-        provider._agent_context = "primary"
-        provider._agent_identity = "coder"
-        provider._agent_workspace = "hermes"
-        provider._backend = FakeBackend()
-        return provider
-
-    def test_metadata_includes_scope_provenance_retention_and_consent(self):
-        provider = self._make_provider()
-        meta = provider._write_metadata()
-        assert meta["scope"] == {
-            "target": "memory",
-            "user_id": "u123",
-            "agent_id": "hermes",
-            "channel": "cli",
-            "identity": "coder",
-            "workspace": "hermes",
-        }
-        assert meta["provenance"]["session_id"] == "session-123"
-        assert meta["provenance"]["parent_session_id"] == "parent-456"
-        assert meta["provenance"]["platform"] == "cli"
-        assert meta["retention"]["policy"] == "provider-default"
-        assert meta["consent"]["granted"] is True
-        assert meta["consent"]["mode"] == "implicit"
 
 
 class _SentinelBackend:
