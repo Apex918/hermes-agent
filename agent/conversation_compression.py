@@ -3721,7 +3721,7 @@ def _commit_compaction(
 
     Failures roll the live list back and arm the split-failure cooldown; a refused (would-grow) candidate returns
     ``refused_prompt`` so the caller hands back the input unchanged. ``verbatim_tail`` (``/compress here N``) is
-    re-inserted after the compacted head by the in-place commit and stamped once durable; rotation ignores it.
+    re-inserted after the compacted head by either commit and stamped once durable.
     """
     session_commit_succeeded = False
     compacted_in_place = False
@@ -3746,10 +3746,11 @@ def _commit_compaction(
                 return _CommitOutcome(
                     compressed=messages, refused_prompt=_refused_sp, commit_started_at=commit_started_at
                 )
+            from agent.context_compressor import PROACTIVE_PRUNE_REARM_MODEL_CONFIG_KEY, stamp_db_persisted_markers
+            from hermes_cli.partial_compress import rejoin_compressed_head_and_tail
             if in_place:
                 # In-place compaction: same session_id; soft-archive old turns (active=0, still
                 # searchable) + insert `compressed` atomically; no pre-flush (tail already in).
-                from agent.context_compressor import PROACTIVE_PRUNE_REARM_MODEL_CONFIG_KEY, stamp_db_persisted_markers
                 # Tail rows tagged by compress() are archived as superseded duplicates, not
                 # compacted=1. Count against the FINAL list — salvage may have dropped rows.
                 tail_count = sum(1 for m in compressed if id(m) in _tail_tagged_ids)
@@ -3781,7 +3782,6 @@ def _commit_compaction(
                     # The kept exchanges are durable rows under the watermark, so the archive below covers
                     # them too. Store them after the head in the same transaction, with the seam the caller
                     # would build, and count their originals as carried duplicates like compress()'s tail.
-                    from hermes_cli.partial_compress import rejoin_compressed_head_and_tail
                     persisted = rejoin_compressed_head_and_tail(compressed, verbatim_tail)
                     tail_count += len(verbatim_tail)
                 from agent.conversation_compression_archive import coverage_for_commit
@@ -3826,10 +3826,16 @@ def _commit_compaction(
                 # rollback off this name, so anything that fails from here on rolls the transcript back
                 # instead of leaving the failed attempt's compacted snapshot in place.
                 old_session_id = agent.session_id
+                if verbatim_tail:
+                    # Publish the kept exchanges with the head, as the in-place branch stores them: the
+                    # gateway no longer rewrites a published child, so a head-only handoff loses the tail.
+                    compressed = rejoin_compressed_head_and_tail(compressed, verbatim_tail)
                 _publish_rotated_compaction(
                     agent, messages, compressed, new_system_prompt=new_system_prompt, lease=lease,
                     old_session_id=old_session_id, compressed_user_turn_outcome=compressed_user_turn_outcome,
                 )
+                if verbatim_tail:
+                    stamp_db_persisted_markers(verbatim_tail)
                 split_status = "rotated_committed"
                 agent._last_flushed_db_idx = len(compressed)
                 agent._flushed_db_message_session_id = agent.session_id
