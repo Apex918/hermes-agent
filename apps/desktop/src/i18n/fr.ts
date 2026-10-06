@@ -1,6 +1,8 @@
 import { defineFieldCopy } from '@/app/settings/field-copy'
 
 import { defineLocale, type TranslationOverrides } from './define-locale'
+import { frAuxTasks } from './fr_aux_tasks'
+import { frModelMenu } from './fr_model_menu'
 import { introFr } from './intro-fr'
 
 export const frOverrides = {
@@ -868,6 +870,15 @@ export const frOverrides = {
     resetConfirm: 'Réinitialiser tous les paramètres aux valeurs par défaut de Hermes ?',
     exportFailed: "Échec de l'export",
     resetFailed: 'Échec de la réinitialisation',
+    pluginPages: {
+      blurb:
+        'Options ajoutées par les plugins installés. Chaque plugin a sa propre page, et certains ajoutent des sous-pages.',
+      empty: "Aucun plugin n'a encore de réglages.",
+      manage: 'Gérer les plugins',
+      agentSettings: "Réglages de l'agent",
+      pageCount: (n: number) => (n === 1 ? '1 page' : `${n} pages`),
+      missing: "Ce plugin n'a pas de page de réglages. Il est peut-être désactivé ou désinstallé."
+    },
     nav: {
       providers: 'Fournisseurs',
       providerAccounts: 'Comptes',
@@ -889,24 +900,15 @@ export const frOverrides = {
     },
     plugins: {
       title: 'Plugins du desktop',
-      blurb:
-        "Étendez cette application, et non un agent : ces plugins sont installés une seule fois pour toute l'application, quel que soit le profil, le gateway ou la machine connectée. Les interrupteurs s'appliquent immédiatement.",
-      count: n => `${n} installés`,
       openFolder: 'Ouvrir le dossier des plugins Desktop',
       rescan: 'Re-analyser',
       reveal: 'Afficher dans le gestionnaire de fichiers',
-      enable: 'Activer',
-      disable: 'Désactiver',
       failed: 'échec',
-      empty: 'Aucun plugin desktop installé pour le moment.',
       kinds: {
         bundled: 'intégré',
         disk: 'sur le disque',
         runtime: "à l'exécution"
       },
-      agentHalfMissing: 'partie agent absente ici',
-      agentHalfMissingTip:
-        "Il s'agit de la partie Desktop d'un plugin groupé, mais sa partie agent n'est pas installée sur le backend ou profil actuellement connecté. Installez-la depuis Capacités → Plugins.",
       installModal: {
         installFromGit: 'Installer depuis Git',
         reviewRepository: 'Examiner le dépôt',
@@ -2020,6 +2022,8 @@ export const frOverrides = {
         'Plateforme distante non prise en charge. Le mode SSH de Hermes Desktop supporte les hôtes distants Linux, macOS et Windows.',
       sshErrTimeout: "Expiration de la connexion SSH. L'hôte peut être inaccessible ou en veille.",
       sshErrUpdateRequired: "Mettez à jour Hermes sur l'hôte distant avant de vous connecter avec Desktop SSH.",
+      sshErrInteractiveAuth:
+        "Tailscale SSH exige une vérification interactive dans le navigateur. Exécutez `ssh <host> true` dans le terminal, terminez la vérification, puis réessayez — Hermes exécute SSH de façon non interactive.",
       sshErrUnknown: 'Échec de la connexion SSH.'
     },
     keys: {
@@ -2128,6 +2132,8 @@ export const frOverrides = {
       change: 'Modifier',
       autoUseMain: 'auto · utiliser le modèle principal',
       inheritMainEffort: 'hériter · effort du modèle principal',
+      inheritsFrom: task => `hérite de ${task}`,
+      followTask: task => `Suivre ${task}`,
       providerDefault: '(par défaut du fournisseur)',
       fallbackAdd: 'Ajouter un secours',
       fallbackEmpty: "Aucun modèle de secours — le modèle par défaut est utilisé sauf en cas d'échec.",
@@ -2140,52 +2146,7 @@ export const frOverrides = {
       moaAggregator: 'Agrégateur',
       moaAggregatorBilled: "modèle actif · facturé pour l'exécution",
       moaReferenceHint: 'donne un avis une fois par tour par défaut',
-      tasks: {
-        vision: {
-          label: 'Vision',
-          hint: "Analyse d'image"
-        },
-        compression: {
-          label: 'Compression',
-          hint: 'Compaction de contexte'
-        },
-        skills_hub: {
-          label: 'Hub de skills',
-          hint: 'Recherche de skills'
-        },
-        approval: {
-          label: 'Approbation',
-          hint: 'Auto-approbation intelligente'
-        },
-        mcp: {
-          label: 'MCP',
-          hint: "Routage d'outils MCP"
-        },
-        title_generation: {
-          label: 'Génération de titre',
-          hint: 'Titres de session'
-        },
-        review: {
-          label: 'Révision',
-          hint: 'Sous-agent de révision /review'
-        },
-        triage_specifier: {
-          label: 'Précision du triage',
-          hint: 'Détail des spécifications Kanban'
-        },
-        kanban_decomposer: {
-          label: 'Décomposition Kanban',
-          hint: 'Décomposition des tâches'
-        },
-        profile_describer: {
-          label: 'Description de profil',
-          hint: 'Descriptions automatiques des profils'
-        },
-        curator: {
-          label: 'Curateur',
-          hint: "Revue d'utilisation des skills"
-        }
-      }
+      tasks: frAuxTasks
     },
     localModels: {
       connectionChanged: 'La connexion des modèles locaux a changé',
@@ -2923,7 +2884,7 @@ export const frOverrides = {
         save: 'Enregistrer les paramètres',
         saved: (name: string) => `Paramètres de ${name} enregistrés.`,
         saveFailed: (name: string) => `Impossible d’enregistrer les paramètres de ${name}`,
-        optional: '(facultatif)',
+        required: 'Obligatoire',
         secretSet: '•••••••• (défini)',
         secretStoredAs: (env: string) =>
           `Stocké dans le .env du profil sous ${env}, jamais dans config.yaml ; laissez vide pour conserver la valeur actuelle.`
@@ -3324,6 +3285,9 @@ export const frOverrides = {
     replaceValue: 'Remplacer la valeur actuelle',
     openDocs: 'Ouvrir la documentation',
     clearField: key => `Effacer ${key}`,
+    addListEntry: 'Ajouter',
+    removeListEntry: 'Retirer',
+    listEntryPlaceholder: 'Saisir un identifiant',
     enableAria: name => `Activer ${name}`,
     disableAria: name => `Désactiver ${name}`,
     platformEnabled: name => `${name} activé`,
@@ -3404,7 +3368,7 @@ export const frOverrides = {
       },
       TELEGRAM_ALLOWED_USERS: {
         label: "IDs d'utilisateurs Telegram autorisés",
-        help: "Recommandé. IDs numériques séparés par des virgules depuis @userinfobot. Sans cela, n'importe qui peut envoyer un message privé à votre bot."
+        help: "Recommandé. IDs numériques (un par case) depuis @userinfobot. Sans cela, n'importe qui peut envoyer un message privé à votre bot."
       },
       TELEGRAM_PROXY: {
         label: 'URL du proxy',
@@ -3416,7 +3380,7 @@ export const frOverrides = {
       },
       DISCORD_ALLOWED_USERS: {
         label: "IDs d'utilisateurs Discord autorisés",
-        help: "Recommandé. IDs d'utilisateurs Discord séparés par des virgules."
+        help: "Recommandé. IDs d'utilisateurs Discord (un par case)."
       },
       DISCORD_REPLY_TO_MODE: {
         label: 'Style de réponse',
@@ -3466,7 +3430,7 @@ export const frOverrides = {
       },
       SLACK_ALLOWED_USERS: {
         label: "IDs d'utilisateurs Slack autorisés",
-        help: "Recommandé. IDs d'utilisateurs Slack séparés par des virgules."
+        help: "Recommandé. IDs d'utilisateurs Slack (un par case)."
       },
       MATTERMOST_URL: {
         label: 'URL du serveur',
@@ -3477,7 +3441,7 @@ export const frOverrides = {
       },
       MATTERMOST_ALLOWED_USERS: {
         label: "IDs d'utilisateurs autorisés",
-        help: "Recommandé. IDs d'utilisateurs Mattermost séparés par des virgules."
+        help: "Recommandé. IDs d'utilisateurs Mattermost (un par case)."
       },
       MATRIX_HOMESERVER: {
         label: 'URL du homeserver',
@@ -3492,7 +3456,7 @@ export const frOverrides = {
       },
       MATRIX_ALLOWED_USERS: {
         label: "IDs d'utilisateurs Matrix autorisés",
-        help: "Recommandé. IDs d'utilisateurs séparés par des virgules au format @utilisateur:serveur."
+        help: "Recommandé. IDs d'utilisateurs (un par case) au format @utilisateur:serveur."
       },
       SIGNAL_HTTP_URL: {
         label: 'URL du pont Signal',
@@ -3505,7 +3469,7 @@ export const frOverrides = {
       },
       SIGNAL_ALLOWED_USERS: {
         label: 'Utilisateurs Signal autorisés',
-        help: 'Recommandé. Identifiants Signal séparés par des virgules.'
+        help: 'Recommandé. Identifiants Signal (un par case).'
       },
       WHATSAPP_ENABLED: {
         label: 'Activer le pont WhatsApp',
@@ -3516,7 +3480,7 @@ export const frOverrides = {
       },
       WHATSAPP_ALLOWED_USERS: {
         label: 'Utilisateurs WhatsApp autorisés',
-        help: 'Recommandé. Numéros de téléphone ou IDs WhatsApp séparés par des virgules.'
+        help: 'Recommandé. Numéros de téléphone ou IDs WhatsApp (un par case).'
       }
     },
     platformIntro: {}
@@ -5060,22 +5024,7 @@ export const frOverrides = {
     windowControls: 'Contrôles de fenêtre',
     paneControls: 'Contrôles de panneau',
     appControls: "Contrôles d'application",
-    modelMenu: {
-      search: 'Rechercher des modèles',
-      noModels: 'Aucun modèle trouvé',
-      editModels: 'Modifier les modèles…',
-      followDefault: 'Utiliser le modèle par défaut des Réglages',
-      refreshModels: 'Actualiser les modèles',
-      favorites: 'Favoris',
-      addFavorite: 'Ajouter aux favoris',
-      removeFavorite: 'Retirer des favoris',
-      favoriteShortcut: '⇧ Clic',
-      fast: 'Rapide',
-      free: 'gratuit',
-      cacheRead: 'lecture en cache',
-      priceTitle: (input: string, output: string, cache: string) =>
-        `Entrée ${input}/Mtok · Sortie ${output}/Mtok` + (cache ? ` · Lecture en cache ${cache}/Mtok` : '')
-    },
+    modelMenu: frModelMenu,
     modelOptions: {
       noOptions: 'Aucune option pour ce modèle',
       options: 'Options',
@@ -6037,9 +5986,6 @@ export const frOverrides = {
     sessionUnavailable: 'Session indisponible',
     createSessionFailed: 'Impossible de créer une nouvelle session',
     promptFailed: "Échec de l'invite",
-    staleSessionTitle: 'Conversation obsolète',
-    staleSessionBody:
-      'Cette fenêtre était en retard sur une autre vue du même chat. Les derniers messages ont été chargés. Renvoyez si vous le souhaitez encore.',
     providerCredentialRequired: "Ajoutez un identifiant de fournisseur avant d'envoyer votre premier message.",
     emptySlashCommand: 'commande slash vide',
     desktopCommands: 'Commandes Desktop',

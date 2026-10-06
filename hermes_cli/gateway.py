@@ -2923,8 +2923,16 @@ def get_launchd_plist_path() -> Path:
     import pwd
     suffix = _profile_suffix()
     name = f"ai.hermes.gateway-{suffix}" if suffix else "ai.hermes.gateway"
-    # Real account home: profile mode may point HOME at a profile dir.
-    home = Path(pwd.getpwuid(os.getuid()).pw_dir)  # windows-footgun: ok — POSIX launchd (macOS) helper, never invoked on Windows
+    # Real account home: profile mode may point HOME at a profile dir. Sandboxed/app-hosted
+    # shells can expose a UID that pwd cannot resolve (#57292); fall back to the shared
+    # real-home resolver (HERMES_REAL_HOME → HOME → pwd → ~, profile home skipped) instead
+    # of crashing launchd commands.
+    try:
+        home = Path(pwd.getpwuid(os.getuid()).pw_dir)  # windows-footgun: ok — POSIX launchd (macOS) helper, never invoked on Windows
+    except (KeyError, ImportError, OSError):
+        from hermes_constants import get_real_home
+
+        home = Path(get_real_home())
     return home / "Library" / "LaunchAgents" / f"{name}.plist"
 
 
@@ -3224,7 +3232,9 @@ def _prepare_service_launcher(*, system: bool = False, run_as_user: str | None =
         owner = (uid, username)
     token = set_hermes_home_override(home)
     try:
-        if resolve_store_python(root) is None:
+        # Publication gate: ask what stage_launcher will bind, so an inherited
+        # HERMES_RUNTIME_DIR cannot stand in for this install's store (#131745).
+        if resolve_store_python(root, publication=True) is None:
             return  # Externally owned Nix/developer runtime.
         local = root / ".hermes" / "bin"
         paths = ensure_install_launchers(root, local)
@@ -3606,7 +3616,7 @@ def _agent_timeout_setting(env_var: str, key: str, parse) -> float:
 
 
 def _get_cron_drain_timeout() -> float:
-    """Return the configured cron-only drain floor in seconds.
+    """Return the configured cron and api_server (/v1) drain floor in seconds.
 
     See #82161.
     """

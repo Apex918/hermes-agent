@@ -1,6 +1,9 @@
 import { defineFieldCopy } from '@/app/settings/field-copy'
 
 import { defineLocale } from './define-locale'
+import { ruAuxTasks } from './ru_aux_tasks'
+import { ruModelMenu } from './ru_model_menu'
+import { ruPluginSettings } from './ru_plugins'
 
 // RU_PLURAL: (count, one, few, many) — русские формы сущ. падежа
 // RU_NOUN: (count, one, few, many) — формы род. множественного
@@ -514,6 +517,7 @@ export const ru = defineLocale({
     resetConfirm: 'Сбросить все настройки к значениям Hermes по умолчанию?',
     exportFailed: 'Не удалось экспортировать',
     resetFailed: 'Не удалось сбросить',
+    pluginPages: ruPluginSettings.pluginPages,
     nav: {
       providers: 'Провайдеры',
       providerAccounts: 'Аккаунты',
@@ -529,67 +533,10 @@ export const ru = defineLocale({
       sessions: 'Сеансы',
       about: 'О программе',
       billing: 'Оплата',
-      notifications: 'Уведомления'
+      notifications: 'Уведомления',
+      plugins: 'Плагины'
     },
-    plugins: {
-      title: 'Плагины приложения',
-      blurb: 'Встроенные или добавленные в папку desktop-plugins. Отключите, чтобы выгрузить без перезапуска.',
-      count: n => `Установлено: ${n}`,
-      openFolder: 'Открыть папку плагинов приложения',
-      rescan: 'Пересканировать',
-      reveal: 'Показать в файловом менеджере',
-      enable: 'Включить',
-      disable: 'Отключить',
-      failed: 'ошибка',
-      empty: 'Плагины приложения пока не установлены.',
-      kinds: { bundled: 'встроенный', disk: 'на диске', runtime: 'runtime' },
-      installModal: {
-        title: 'Установка плагина',
-        description: 'Перед установкой посмотрите, что содержит этот репозиторий.',
-        repoLabel: 'Репозиторий',
-        includesHeading: 'Состав пакета',
-        agentLabel: 'Плагин агента',
-        desktopLabel: 'UI приложения',
-        profileLabel: 'Установить для профиля',
-        agentTargetLocal: (profile, dir) => `Устанавливается в локальный бэкенд ${profile} (${dir})`,
-        agentTargetRemote: profile => `Устанавливается в подключённый бэкенд ${profile}`,
-        desktopTarget: 'Устанавливается в локальную папку desktop-plugins этого приложения',
-        desktopOnlyNote: 'Пакеты только для приложения не устанавливают плагин агента.',
-        insecureWarning:
-          'Этот URL использует небезопасную или локальную схему. Для боевой установки предпочитайте https:// или git@.',
-        securityHeading: 'Перед установкой',
-        securityIntro:
-          'Устанавливайте только из проверенных источников — при желании просмотрите репозиторий ниже, чтобы увидеть, что будет добавлено.',
-        sourceHeading: 'Исходный код',
-        viewRepository: 'Посмотреть репозиторий',
-        viewPluginFiles: 'Посмотреть файлы плагина',
-        gitCloneLabel: 'URL для git clone',
-        enableAgent: 'Включить плагин агента после установки',
-        forceReinstall: 'Принудительная переустановка (заменить, если уже установлен)',
-        pinToCommit: 'Закрепить на коммите (необязательно)',
-        pinToCommitPlaceholder: 'Полный SHA коммита (40 символов)',
-        pinToCommitHint:
-          'Все, кто установит этот SHA, получат одинаковый код; плагин перестанет обновляться до смены пина. Оставьте пустым для последнего коммита.',
-        pinToCommitInvalid: 'Нужен полный SHA коммита из 40 символов (ветки и теги не принимаются).',
-        install: 'Установить',
-        installing: 'Установка…',
-        probing: 'Осмотр репозитория…',
-        probeUnavailable: 'Осмотр плагинов недоступен в этом окружении.',
-        desktopUnavailable: 'Установка плагинов приложения недоступна в этом окружении.',
-        selectComponent: 'Выберите хотя бы один компонент для установки.',
-        agentSuccess: name => `Плагин агента ${name} установлен`,
-        desktopSuccess: name => `Плагин приложения ${name} установлен`,
-        agentFailed: 'Не удалось установить плагин агента',
-        installUncertain:
-          'Hermes перестал ждать результат установки, но плагин может всё ещё устанавливаться. Закройте это окно и обновите список плагинов перед повторной установкой.',
-        desktopFailed: 'Не удалось установить плагин приложения',
-        missingEnv: (_name, vars) => `Не хватает переменных окружения: ${vars}. Добавьте их в Настройки → Ключи.`,
-        toolsConnected: n => `Подключено инструментов: ${n}`,
-        skillsReady: names => (names.length === 1 ? `навык ${names[0]} готов` : `готово навыков: ${names.length}`),
-        nextChat: 'остальные инструменты появятся в следующем чате',
-        serverNotConnected: (server, reason) => `MCP-сервер ${server} не подключён${reason ? `: ${reason}` : '.'}`
-      }
-    },
+    plugins: ruPluginSettings.plugins,
     notifications: {
       title: 'Уведомления',
       intro: 'Системные уведомления (не всплывающие внутри приложения). Настраивается для каждого устройства.',
@@ -1402,6 +1349,8 @@ export const ru = defineLocale({
         'Неподдерживаемая удалённая платформа. SSH-режим Hermes Desktop поддерживает удалённые хосты Linux, macOS и Windows.',
       sshErrTimeout: 'SSH-соединение истекло. Хост может быть недоступен или «спит».',
       sshErrUpdateRequired: 'Перед подключением через SSH обновите Hermes на удалённой машине.',
+      sshErrInteractiveAuth:
+        'Tailscale SSH требует интерактивной проверки в браузере. Выполните `ssh <host> true` в терминале, завершите проверку и повторите попытку — Hermes запускает SSH неинтерактивно.',
       sshErrUnknown: 'SSH-соединение не удалось.'
     },
     keys: {
@@ -1506,20 +1455,14 @@ export const ru = defineLocale({
       change: 'Изменить',
       autoUseMain: 'авто · использовать основную модель',
       inheritMainEffort: 'наследовать · усилие основной модели',
+      inheritsFrom: task => `наследует ${task}`,
+      followTask: task => `Как ${task}`,
       providerDefault: '(по умолчанию провайдера)',
       fallbackAdd: 'Добавить запасную',
       fallbackEmpty: 'Запасных моделей нет — используется модель по умолчанию, если она не падает.',
       notInCatalog: 'нет в списке моделей этого провайдера — вызовы могут уходить на запасную.',
       moaTitle: 'Смесь агентов',
-      tasks: {
-        vision: { label: 'Зрение', hint: 'Анализ изображений' },
-        compression: { label: 'Сжатие', hint: 'Компрессия контекста' },
-        skills_hub: { label: 'Хаб навыков', hint: 'Поиск навыков' },
-        approval: { label: 'Одобрение', hint: 'Умное авто-одобрение' },
-        mcp: { label: 'MCP', hint: 'Маршрутизация MCP-инструментов' },
-        title_generation: { label: 'Ген. заголовка', hint: 'Заголовки сеансов' },
-        curator: { label: 'Куратор', hint: 'Просмотр использования навыков' }
-      }
+      tasks: ruAuxTasks
     },
     providers: {
       connectAccount: 'Подключить аккаунт',
@@ -2098,6 +2041,9 @@ export const ru = defineLocale({
     replaceValue: 'Заменить текущее значение',
     openDocs: 'Открыть документацию',
     clearField: key => `Очистить ${key}`,
+    addListEntry: 'Добавить ещё',
+    removeListEntry: 'Удалить',
+    listEntryPlaceholder: 'Введите ID',
     enableAria: name => `Включить ${name}`,
     disableAria: name => `Отключить ${name}`,
     platformEnabled: name => `${name} включено`,
@@ -2173,7 +2119,7 @@ export const ru = defineLocale({
       },
       TELEGRAM_ALLOWED_USERS: {
         label: 'Разрешённые ID пользователей Telegram',
-        help: 'Рекомендуется. Числовые ID через @userinfobot через запятую. Без этого писать вашему боту может кто угодно.'
+        help: 'Рекомендуется. Числовые ID через @userinfobot (по одному в поле). Без этого писать вашему боту может кто угодно.'
       },
       TELEGRAM_PROXY: { label: 'URL прокси', help: 'Нужен только в сетях, где Telegram заблокирован.' },
       DISCORD_BOT_TOKEN: {
@@ -2182,7 +2128,7 @@ export const ru = defineLocale({
       },
       DISCORD_ALLOWED_USERS: {
         label: 'Разрешённые ID пользователей Discord',
-        help: 'Рекомендуется. ID пользователей Discord через запятую.'
+        help: 'Рекомендуется. ID пользователей Discord (по одному в поле).'
       },
       DISCORD_REPLY_TO_MODE: { label: 'Стиль ответов', help: 'first, all или off.' },
       DISCORD_ALLOW_ALL_USERS: {
@@ -2218,20 +2164,20 @@ export const ru = defineLocale({
       },
       SLACK_ALLOWED_USERS: {
         label: 'Разрешённые ID пользователей Slack',
-        help: 'Рекомендуется. ID пользователей Slack через запятую.'
+        help: 'Рекомендуется. ID пользователей Slack (по одному в поле).'
       },
       MATTERMOST_URL: { label: 'URL сервера', placeholder: 'https://mattermost.example.com' },
       MATTERMOST_TOKEN: { label: 'Токен бота' },
       MATTERMOST_ALLOWED_USERS: {
         label: 'Разрешённые ID пользователей',
-        help: 'Рекомендуется. ID пользователей Mattermost через запятую.'
+        help: 'Рекомендуется. ID пользователей Mattermost (по одному в поле).'
       },
       MATRIX_HOMESERVER: { label: 'URL homeserver', placeholder: 'https://matrix.org' },
       MATRIX_ACCESS_TOKEN: { label: 'Токен доступа' },
       MATRIX_USER_ID: { label: 'ID пользователя бота', placeholder: '@hermes:example.org' },
       MATRIX_ALLOWED_USERS: {
         label: 'Разрешённые ID пользователей Matrix',
-        help: 'Рекомендуется. ID пользователей через запятую в формате @user:server.'
+        help: 'Рекомендуется. ID пользователей (по одному в поле) в формате @user:server.'
       },
       SIGNAL_HTTP_URL: {
         label: 'URL моста Signal',
@@ -2241,7 +2187,7 @@ export const ru = defineLocale({
       SIGNAL_ACCOUNT: { label: 'Номер телефона', help: 'Номер, зарегистрированный в вашем мосте signal-cli.' },
       SIGNAL_ALLOWED_USERS: {
         label: 'Разрешённые пользователи Signal',
-        help: 'Рекомендуется. Идентификаторы Signal через запятую.'
+        help: 'Рекомендуется. Идентификаторы Signal (по одному в поле).'
       },
       WHATSAPP_ENABLED: {
         label: 'Включить мост WhatsApp',
@@ -2250,7 +2196,7 @@ export const ru = defineLocale({
       WHATSAPP_MODE: { label: 'Режим моста' },
       WHATSAPP_ALLOWED_USERS: {
         label: 'Разрешённые пользователи WhatsApp',
-        help: 'Рекомендуется. Номера телефонов или ID WhatsApp через запятую.'
+        help: 'Рекомендуется. Номера телефонов или ID WhatsApp (по одному в поле).'
       }
     },
     platformIntro: {}
@@ -3568,22 +3514,7 @@ export const ru = defineLocale({
     windowControls: 'Управление окном',
     paneControls: 'Управление панелями',
     appControls: 'Управление приложением',
-    modelMenu: {
-      search: 'Поиск моделей',
-      noModels: 'Модели не найдены',
-      editModels: 'Изменить модели…',
-      followDefault: 'Использовать модель по умолчанию из настроек',
-      refreshModels: 'Обновить модели',
-      favorites: 'Избранное',
-      addFavorite: 'Добавить в избранное',
-      removeFavorite: 'Убрать из избранного',
-      favoriteShortcut: '⇧ Клик',
-      fast: 'Быстрая',
-      free: 'бесплатно',
-      cacheRead: 'чтение из кэша',
-      priceTitle: (input: string, output: string, cache: string) =>
-        `Вход ${input}/Mtok · Выход ${output}/Mtok` + (cache ? ` · Чтение из кэша ${cache}/Mtok` : '')
-    },
+    modelMenu: ruModelMenu,
     modelOptions: {
       noOptions: 'Для этой модели нет опций',
       options: 'Опции',
@@ -3652,6 +3583,9 @@ export const ru = defineLocale({
       showTerminal: 'Показать терминал',
       hideTerminal: 'Скрыть терминал',
       gateway: 'Шлюз',
+      backend: 'Бэкенд',
+      messagingStopped: 'шлюз сообщений остановлен',
+      messagingDegraded: name => `${name} недоступен`,
       gatewayReady: 'готов',
       gatewayNeedsSetup: 'нужна настройка',
       gatewayChecking: 'проверка',
@@ -4208,9 +4142,6 @@ export const ru = defineLocale({
     sessionUnavailable: 'Сеанс недоступен',
     createSessionFailed: 'Не удалось создать новый сеанс',
     promptFailed: 'Промпт не удался',
-    staleSessionTitle: 'Чат устарел',
-    staleSessionBody:
-      'Это окно отставало от другого вида того же чата. Загружены последние сообщения. Отправьте снова, если всё ещё хотите.',
     providerCredentialRequired: 'Добавьте учётные данные провайдера перед отправкой первого сообщения.',
     emptySlashCommand: 'пустая слэш-команда',
     desktopCommands: 'Команды desktop',
