@@ -138,7 +138,7 @@ def _request_with(url: str, accept: str, token: str | None) -> str:
 
 
 def _branch_tip(repository: str | None, branch: str, root: Path, git: str,
-                remote: str = "origin") -> tuple[str | None, bool, str | None]:
+                 remote: str = "origin") -> tuple[str | None, bool, str | None]:
     """``(sha, missing, failure)``: ``missing`` only on a confirmed empty advertisement;
     ``failure`` names why no tip could be read, for the user-facing message."""
     # A successful empty ref advertisement alone proves a branch was deleted.
@@ -150,6 +150,12 @@ def _branch_tip(repository: str | None, branch: str, root: Path, git: str,
             sha = _request(f"https://api.github.com/repos/{repository}/commits/{quote(branch, safe='')}",
                            "application/vnd.github.sha")
         except Exception as exc:
+            if _github_reports_missing_commit_ref(exc):
+                # GitHub's commits/{ref} endpoint returns 422 (rather than 404)
+                # when a syntactically valid branch has no commit. Treat that
+                # explicit response as an absent ref so the existing local-only
+                # safeguards can distinguish an unpublished branch from outage.
+                return None, True, None
             sha = None
             failure = describe_github_failure(exc, authenticated=github_token() is not None)
         if _is_full_sha(sha):
@@ -170,6 +176,22 @@ def _branch_tip(repository: str | None, branch: str, root: Path, git: str,
     detail = (result.stderr or "").strip().splitlines()
     return None, False, failure or (f"`git ls-remote {remote}` failed: {detail[-1]}" if detail
                                     else f"`git ls-remote {remote}` returned no tip.")
+
+
+def _github_reports_missing_commit_ref(exc: BaseException) -> bool:
+    """Whether GitHub explicitly says a commits/{ref} lookup found no commit.
+
+    GitHub uses HTTP 422 for this case. Other 422 responses remain ordinary
+    failures and must not be mistaken for proof that a branch was deleted.
+    """
+    if not isinstance(exc, urllib.error.HTTPError) or exc.code != 422:
+        return False
+    try:
+        payload = json.loads(exc.read(64 * 1024).decode("utf-8", errors="replace"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return False
+    message = payload.get("message") if isinstance(payload, dict) else None
+    return isinstance(message, str) and message.lower().startswith("no commit found for sha:")
 
 
 def _commits(payload: dict | None) -> list[dict]:
