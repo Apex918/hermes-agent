@@ -161,6 +161,23 @@ def test_counts_are_honest_without_fetch(installation, tip_kind, compare, expect
         assert requests == [MAIN_CHANNEL, "/repos/fixture/fork/commits/main"]
 
 
+def test_github_422_for_unpublished_branch_is_reported_as_local_only(installation):
+    from hermes_cli.source_check import check_for_updates
+
+    root, linked, home, base, head, responses, requests, git = installation
+    branch = "feature/gui"
+    responses[f"/repos/fixture/fork/commits/{branch.replace('/', '%2F')}"] = (
+        422, {"message": f"No commit found for SHA: {branch}"}
+    )
+
+    status = check_for_updates(install_root=linked, home=home)
+
+    assert status["error"] == "branch-local-only"
+    assert status["localOnly"] is True
+    assert "never been pushed" in status["message"]
+    assert requests == [MAIN_CHANNEL, "/repos/fixture/fork/commits/feature%2Fgui"]
+
+
 def test_cache_force_expiry_and_passive_opt_out(installation, monkeypatch):
     from hermes_cli import source_check
     root, linked, home, base, head, responses, requests, git = installation
