@@ -294,7 +294,7 @@ def _seed_branch_row(record: dict, key: str, parent_session_id: str, history: li
             _persist_branch(db, key, parent_session_id, _branch_title(db, parent_session_id), history,
                             source=source, cwd=None if _is_remote_launch_cwd(record) else record["cwd"],
                             profile_name=profile_name_for_home(profile_home) or _current_profile_name(),
-                            model=_session_default_model(record), compensate=True, title_source="derived", user_id=_session_auth_user_id(record))
+                            model=_session_default_route(record)[0], compensate=True, title_source="derived", user_id=_session_auth_user_id(record))
             record["pending_title"] = None
             # The first submit's _persist_branch_seed is the fallback for a failed seed, not a second copy.
             record["_branch_seed_persisted"] = True
@@ -370,9 +370,7 @@ def _create_session(rid, params: dict, *, copy_parent_history: bool = False) -> 
                         "message_count": len(history),
                         **({"messages_omitted": True} if copy_parent_history
                            else {"messages": _history_to_messages(history, profile_home=session.get("profile_home"))}),
-                        "info": {"model": override.get("model") if override else _session_default_model(session),
-                                 **({"provider": override["provider"]} if override.get("provider") else {}),
-                                 "tools": {}, "skills": {}, "cwd": session["cwd"], "branch": git_probe.branch(session["cwd"]),
+                        "info": {**_lazy_info_route(session, override), "tools": {}, "skills": {}, "cwd": session["cwd"], "branch": git_probe.branch(session["cwd"]),
                                  "project": _project_info_for_cwd(session["cwd"]), "lazy": True,
                                  "desktop_contract": DESKTOP_BACKEND_CONTRACT,
                                  "profile_name": _response_profile_name(profile)}})
@@ -450,7 +448,7 @@ def _create_session(rid, params: dict, *, copy_parent_history: bool = False) -> 
         # name both so agent.log alone explains which model a new chat runs, and why (#107410).
         logger.info("session.create %s: model=%s provider=%s source=client override (profile default: %s)",
                     key, session_model_override["model"], session_model_override.get("provider") or "-",
-                    _session_default_model(_sessions[sid]))
+                    _session_default_route(_sessions[sid])[0])
     # No DB row here (drafts left "Untitled" litter): created on the first prompt — except seeded sessions.
     # NOTE: we intentionally do NOT persist a DB row here. Every TUI/desktop launch (and every "New agent" /
     # draft) opens a session here just to paint the composer, so eagerly creating a row left an "Untitled"
@@ -485,10 +483,7 @@ def _create_session(rid, params: dict, *, copy_parent_history: bool = False) -> 
     return _ok(rid, {
         "session_id": sid, "stored_session_id": key, "message_count": len(messages),
         **({"messages_omitted": True} if copy_parent_history else {"messages": messages}),
-        # Reflect the override now so the client doesn't clobber its sticky pick.
-        "info": {"model": override.get("model") if override else _session_default_model(_sessions[sid]),
-                 **({"provider": override["provider"]} if override.get("provider") else {}),
-                 "tools": {}, "skills": {}, "cwd": cwd, "branch": git_probe.branch(cwd),
+        "info": {**_lazy_info_route(_sessions[sid], override), "tools": {}, "skills": {}, "cwd": cwd, "branch": git_probe.branch(cwd),
                  "project": _project_info_for_cwd(cwd), "lazy": True, "desktop_contract": DESKTOP_BACKEND_CONTRACT,
                  "profile_name": _response_profile_name(profile)}})
 
@@ -854,7 +849,16 @@ def _resume_follow_tip(ctx: _Resume) -> None:
 def _resume_guard(ctx: _Resume) -> dict | None:
     """Refuse a runaway transcript before any history read (sessions.max_resume_messages). Deferred /
     omit_messages / lazy paths load the TIP segment only and are guarded tip-only (a lineage count rejected
-    exactly the well-compressed chats). Metadata fallback for lightweight adaptor DBs; fails OPEN on errors."""
+    exactly the well-compressed chats). Metadata fallback for lightweight adaptor DBs; fails OPEN on errors.
+
+    Kanban worker transcripts refuse FIRST and fail CLOSED on a positive match (#68779): a
+    resumed Desktop/TUI session would be a write-capable writer with none of the dispatcher
+    ownership env, invisible to the board while a re-dispatch can start a competing writer
+    in the same workspace. One guard for every resume shape below (cold / eager / deferred /
+    lazy / live-reuse) — no slash worker is ever built for a refused session."""
+    from hermes_cli.kanban_resume_guard import kanban_resume_refusal
+    if (kanban_refusal := kanban_resume_refusal(ctx.db, ctx.target)) is not None:
+        return _err(ctx.rid, 4132, kanban_refusal)
     from hermes_state import SessionResumeTooLargeError, resolved_max_resume_messages
     tip_only = ctx.lazy or ctx.omit_messages or (ctx.defer_history and not ctx.eager_build)
     try:
@@ -2019,7 +2023,7 @@ def _(rid, params: dict, session: dict) -> dict:
 @_session_method("session.undo", live=True)
 def _(rid, params: dict, session: dict) -> dict:
     # Under a running turn the post-run write would clobber the undo — stop the reply first.
-    busy = _err(rid, 4009, busy_message("undo"))
+    busy = _err(rid, 4009, busy_message("undo", bool(session.get("_manual_compress_active"))))
     if session.get("running"):
         return busy
     removed = 0
@@ -2037,13 +2041,6 @@ def _(rid, params: dict, session: dict) -> dict:
     if removed:  # Ink /retry is undo + resend and says so via ``intent`` (helper: methods_tools).
         _tui_model_friction("retry" if params.get("intent") == "retry" else "undo", session)
     return _ok(rid, {"removed": removed})
-
-
-def _compute_host_ack_error(rid, ack: dict, code: int, default: str):
-    """``_err`` for a ``control.error``/``error`` ack, else None."""
-    if ack.get("type") in {"control.error", "error"}:
-        return _err(rid, code, str(ack.get("message") or default))
-    return None
 
 
 def _save_via_compute_host(rid, params: dict) -> dict:
@@ -2152,11 +2149,12 @@ def _(rid, params: dict) -> dict:
     session, err = _sess(params, rid)
     if err:
         return err
-    if session.get("running"):
-        return _err(rid, 4009, busy_message("compress"))
     sid = params.get("session_id", "")
     try:
-        return _compress_live(rid, sid, session, _str_param(params, "focus_topic"))
+        with _manual_compress_turn(sid, session):
+            return _compress_live(rid, sid, session, _str_param(params, "focus_topic"))
+    except CompressionBusy as e:
+        return _err(rid, 4009, str(e))
     except CompressionLockHeld as e:
         _status_update(sid, "ready")
         from agent.manual_compression_feedback import describe_compression_lock_skip
@@ -2303,7 +2301,7 @@ def _branch_live(rid, params: dict, session: dict, *, omit_messages: bool = Fals
             _persist_branch(db, new_key, old_key, title, history, source=source,
                             cwd=None if _is_remote_launch_cwd(session) else _session_cwd(session),
                             profile_name=profile_name_for_home(home) or _current_profile_name(),
-                            model=_session_default_model(session), copy_fields=_BRANCH_COPY_FIELDS,
+                            model=_session_default_route(session)[0], copy_fields=_BRANCH_COPY_FIELDS,
                             title_source="user" if params.get("name") else "derived",
                             user_id=_session_auth_user_id(session))
         except Exception as e:
@@ -2363,127 +2361,8 @@ def _(rid, params: dict, session: dict) -> dict:
     return _branch_live(rid, params, session, omit_messages=True)
 
 
-def _resume_wake_after_interrupt() -> None:
-    """Re-arm a wake lease held by the interrupt caller or a voice capture.
-
-    ``_wake_resume_if_owner`` no-ops unless that object holds the lease, so an
-    in-progress capture owned by someone else is not stolen. Interrupt already
-    silenced TTS before it can return an error; this matches that cut. A
-    ``not_interrupted`` hosted-task mismatch must not call it.
-    """
-    with _voice_sid_lock:
-        voice_owner = _voice_wake_owner
-    seen = []
-    for owner in (_caller_transport(), voice_owner):
-        if owner is None or any(owner is item for item in seen):
-            continue
-        seen.append(owner)
-        _wake_resume_if_owner(owner)
 
 
-# ── interrupt / steer / redirect ─────────────────────────────────────
-@method("session.interrupt")
-def _(rid, params: dict) -> dict:
-    _tts_stream_stop()  # keypress barge-in also silences streaming TTS (voice is process-global)
-    resume_wake = True
-    try:
-        session, err = _sess_nowait(params, rid)
-        if err:
-            return err
-        if expected := _str_param(params, "expected_hosted_task_id"):
-            with session["history_lock"]:
-                task = session.get("_hosted_room_task")
-                if not (session.get("running") and isinstance(task, dict) and task.get("task_id") == expected):
-                    resume_wake = False
-                    return _ok(rid, {"status": "not_interrupted", "interrupted": False})
-        sid = str(params.get("session_id") or "")
-        if _session_uses_compute_host(session):
-            try:
-                _interrupt_session_turn(sid, session, request_id=f"interrupt-{rid}")
-            except Exception as exc:
-                return _err(rid, 5019, f"compute-host interrupt failed: {exc}")
-            return _ok(rid, {"status": "interrupted", "turn_isolation": True})
-        session, err = _sess(params, rid)
-        if err:
-            return err
-        _interrupt_session_turn(sid, session)
-        # Retire the crash-recovery marker NOW: until the run thread's finally, a backend exit looks like a crash
-        # and session.resume auto-continues the turn the user just stopped (the extra key covers compression
-        # rotating session_key mid-turn).
-        with session["history_lock"]:
-            active_marker_key = str(session.pop("_active_turn_marker_key", "") or "")
-        _retire_turn_marker(session, active_marker_key)
-        return _ok(rid, {"status": "interrupted"})
-    finally:
-        if resume_wake:
-            try:
-                _resume_wake_after_interrupt()
-            except Exception:
-                logger.debug("session.interrupt wake resume failed", exc_info=True)
-
-
-def _apply_correction(rid, session: dict, verb: str, text: str, accepted_status: str) -> dict:
-    """``agent.<verb>(text)``; on acceptance record it on the live turn (mid-turn resume rebuilds the bubble)
-    and purge queued self-copies so post-turn drain cannot re-fire the old prompt."""
-    try:
-        accepted = getattr(session["agent"], verb)(text)
-    except Exception as exc:
-        return _err(rid, 5000, f"{verb} failed: {exc}")
-    if accepted:
-        with session["history_lock"]:
-            _record_inflight_correction(session, text)
-            # #84417: steer does not cancel the live original, but a server queue self-copy of that original
-            # must still not re-fire after settle (same class as redirect).
-            # #84417: purge server-queue self-duplicates of the live original so post-turn drain cannot
-            # restart the pre-correction prompt.
-            _drop_queued_duplicates_of_inflight_user(session)
-            session["last_active"] = time.time()
-    return _ok(rid, {"status": accepted_status if accepted else "rejected", "text": text})
-
-
-def _correction_method(name: str, verb: str, accepted_status: str, supported, unsupported: str):
-    """steer/redirect RPC: ``params.text`` (4002, checked before the session) into a live session;
-    ``supported(agent)`` gates 4010."""
-    @method(name)
-    def _(rid, params: dict) -> dict:
-        if not (text := (params.get("text") or "").strip()):
-            return _err(rid, 4002, "text is required")
-        session, err = _sess_nowait(params, rid)
-        if err:
-            return err
-        agent = session.get("agent")
-        # Redirect during the turn-build window (running=True, agent None): queue for the next turn instead of
-        # a misleading 4010 the client swallows into a lost follow-up.
-        if verb == "redirect" and agent is None and session.get("running"):
-            _enqueue_prompt(session, text, current_transport() or _stdio_transport)
-            session["last_active"] = time.time()
-            return _ok(rid, {"status": "queued", "text": text})
-        # Compression in flight: queue instead of steering/redirecting. A correction that
-        # reaches the provider mid-compression aborts the compression (explicit_interrupt)
-        # — the follow-up kills the turn that would answer it (#61042). Queued here, it
-        # drains when compression finishes (the Discord-gateway contract; mirrors the
-        # interrupt→queue demotion in gateway/run_busy.py for the channel busy path).
-        if _session_compression_in_flight(session):
-            _enqueue_prompt(session, text, current_transport() or _stdio_transport)
-            session["last_active"] = time.time()
-            return _ok(rid, {"status": "queued", "text": text})
-        if not supported(agent):
-            return _err(rid, 4010, unsupported)
-        # An idle agent accepts steer() but only the next turn drains it, spliced after an old tool
-        # row (#64578). 'rejected' makes the client queue it as a normal next prompt.
-        if verb == "steer" and not session.get("running"):
-            return _ok(rid, {"status": "rejected", "text": text})
-        return _apply_correction(rid, session, verb, text, accepted_status)
-
-
-# Inject text into the next tool result without interrupting (AIAgent.steer(): no new user turn, no role
-# alternation violation).
-_correction_method("session.steer", "steer", "queued", lambda agent: hasattr(agent, "steer"),
-                   "agent does not support steer")
-# Redirect the active model turn while preserving valid work/context.
-_correction_method("session.redirect", "redirect", "redirected",
-                   lambda agent: getattr(agent, "_supports_active_turn_redirect", False) is True
-                   and hasattr(agent, "redirect"), "agent does not support active-turn redirect")
 
 
 # ── delegation / spawn trees ─────────────────────────────────────────
@@ -2627,3 +2506,5 @@ def _(rid, params: dict) -> dict:
 def register(server) -> None:
     """Publish this module's helpers onto ``server`` (rebound to its globals) and install handlers."""
     bind_module(globals(), server, skip=("_",))
+    from . import methods_session_interrupt
+    methods_session_interrupt.register(server)
